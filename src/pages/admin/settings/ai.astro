@@ -1,0 +1,30 @@
+---
+import DashboardLayout from '../../../layouts/DashboardLayout.astro';
+import { AiSettings } from '../../../components/admin/AiSettings';
+import { createDbClient } from '../../../db';
+import { getAdminPermissions } from '../../../lib/rbac';
+
+const user = Astro.locals.user;
+const runtime = (Astro.locals as any).runtime;
+const db = await createDbClient(runtime?.env?.DB);
+const permissions = await getAdminPermissions(db, user?.id);
+
+// 只有具有 settings.ai、role.manage 或 * 权限的用户才能访问 AI 配置
+if (!permissions.includes('settings.ai') && !permissions.includes('role.manage') && !permissions.includes('*')) {
+  return Astro.redirect('/admin');
+}
+---
+
+<DashboardLayout title="AI 网关配置">
+  <div class="mb-6">
+    <div class="flex items-center gap-2 text-sm text-slate-500 mb-2">
+      <a href="/admin" class="hover:text-blue-600">管理后台</a>
+      <span>/</span>
+      <span class="text-slate-800 font-medium">配置中心</span>
+      <span>/</span>
+      <span class="text-slate-800 font-medium">AI 网关</span>
+    </div>
+  </div>
+  
+  <AiSettings client:load />
+</DashboardLayout>

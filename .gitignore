@@ -1,0 +1,8 @@
+node_modules
+/dist
+.astro
+/*.toml
+/test-reports
+/playwright-report
+/test-results
+/src/test-reports

@@ -1,0 +1,96 @@
+---
+import '../styles/global.css';
+
+// 如果已经登录，直接跳回后台首页
+if (Astro.locals.user) {
+  return Astro.redirect('/admin');
+}
+---
+
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>登录 - 管理后台</title>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen">
+    <div class="max-w-md w-full bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+        <div class="text-center mb-8">
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">管理后台登录</h1>
+            <p class="text-gray-500 text-sm">请输入您的凭据以继续</p>
+        </div>
+
+        <form id="login-form" class="space-y-6">
+            <div>
+                <label for="username" class="block text-sm font-medium text-gray-700 mb-1">用户名</label>
+                <input 
+                    type="text" 
+                    id="username" 
+                    name="username" 
+                    required 
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+                    placeholder="请输入用户名"
+                />
+            </div>
+
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">密码</label>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    required 
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+                    placeholder="请输入密码"
+                />
+            </div>
+
+            <div id="error-msg" class="text-red-500 text-sm hidden bg-red-50 p-2 rounded border border-red-100 italic"></div>
+
+            <button 
+                type="submit" 
+                class="w-full bg-black text-white py-2.5 rounded-lg font-semibold hover:bg-gray-800 transition-colors shadow-md active:scale-[0.98]"
+            >
+                立即登录
+            </button>
+        </form>
+
+        <p class="mt-8 text-center text-xs text-gray-400">
+            &copy; 2026 全自动外贸系统 - 安全连接
+        </p>
+    </div>
+
+    <script>
+        const form = document.getElementById('login-form') as HTMLFormElement;
+        const errorMsg = document.getElementById('error-msg')!;
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorMsg.classList.add('hidden');
+            
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+
+            try {
+                const res = await fetch('/api/auth/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await res.json();
+
+                if (res.ok) {
+                    window.location.href = '/admin';
+                } else {
+                    errorMsg.textContent = result.error || '登录失败，请稍后重试';
+                    errorMsg.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorMsg.textContent = '网络错误，请检查您的连接';
+                errorMsg.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+---
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+import { ModelsManagement } from '../../components/admin/ModelsManagement';
+import { ErrorBoundary } from '../../components/ui/ErrorBoundary';
+---
+
+<DashboardLayout title="模型引擎管理">
+  <ErrorBoundary client:only="react">
+    <ModelsManagement client:load />
+  </ErrorBoundary>
+</DashboardLayout>

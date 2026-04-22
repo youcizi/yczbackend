@@ -1,0 +1,30 @@
+---
+import DashboardLayout from '../../../layouts/DashboardLayout.astro';
+import { MailSettings } from '../../../components/admin/MailSettings';
+import { createDbClient } from '../../../db';
+import { getAdminPermissions } from '../../../lib/rbac';
+
+const user = Astro.locals.user;
+const runtime = (Astro.locals as any).runtime;
+const db = await createDbClient(runtime?.env?.DB);
+const permissions = await getAdminPermissions(db, user?.id);
+
+// NOTE: 邮件服务使用独立的 settings.mail 权限，无需 role.manage 级别
+if (!permissions.includes('settings.mail') && !permissions.includes('*')) {
+  return Astro.redirect('/admin');
+}
+---
+
+<DashboardLayout title="邮件服务">
+  <div class="mb-6">
+    <div class="flex items-center gap-2 text-sm text-slate-500 mb-2">
+      <a href="/admin" class="hover:text-blue-600">管理后台</a>
+      <span>/</span>
+      <span class="text-slate-800 font-medium">配置中心</span>
+      <span>/</span>
+      <span class="text-slate-800 font-medium">邮件服务</span>
+    </div>
+  </div>
+  
+  <MailSettings client:load />
+</DashboardLayout>

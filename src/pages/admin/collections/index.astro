@@ -1,0 +1,11 @@
+---
+import DashboardLayout from '../../../layouts/DashboardLayout.astro';
+import { ContentManagement } from '../../../components/admin/ContentManagement';
+import { CollectionsManagement } from '../../../components/admin/CollectionsManagement';
+
+const { slug } = Astro.params;
+---
+
+<DashboardLayout title="业务集合管理">
+  <CollectionsManagement client:load />
+</DashboardLayout>

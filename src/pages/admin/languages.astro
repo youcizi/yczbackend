@@ -1,0 +1,11 @@
+---
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+import { LanguagesManagement } from '../../components/admin/LanguagesManagement';
+import { ErrorBoundary } from '../../components/ui/ErrorBoundary';
+---
+
+<DashboardLayout title="语言设置">
+  <ErrorBoundary client:only="react">
+    <LanguagesManagement client:load />
+  </ErrorBoundary>
+</DashboardLayout>

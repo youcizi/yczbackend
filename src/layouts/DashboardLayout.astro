@@ -1,0 +1,97 @@
+---
+import { Sidebar } from '../components/Sidebar';
+import { Toaster } from '../components/ui/Toaster';
+import { AiFloatingBot } from '../components/ai/AiFloatingBot';
+import { type AdminRole, getAdminPermissions, hasPermission } from '../lib/rbac';
+import { createDbClient } from '../db';
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+
+/**
+ * 从 Astro.locals 获取用户信息
+ */
+const user = Astro.locals.user as { id: string; username: string; role: AdminRole } | null;
+const currentPath = Astro.url.pathname;
+
+// 安全兜底
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+// 动态获取当前用户的所有权限集合及可用模型
+const runtime = (Astro.locals as any).runtime;
+const db = await createDbClient(runtime?.env?.DB);
+const permissions = await getAdminPermissions(db, user.id);
+
+import { models as modelsTable, collections as collectionsTable } from '../db/schema';
+const allModels = await db.select().from(modelsTable).all();
+const allCollections = await db.select().from(collectionsTable).all();
+---
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title} - 管理系统</title>
+</head>
+<body class="bg-slate-50 text-slate-900 overflow-hidden h-screen flex">
+  <!-- 侧边栏 (React 组件) -->
+  <Sidebar 
+    client:load 
+    permissions={permissions} 
+    currentPath={currentPath} 
+    username={user?.username} 
+    models={allModels} 
+    collections={allCollections}
+  />
+
+  <!-- 主内容区域 -->
+  <div class="flex-1 flex flex-col h-full overflow-hidden">
+    <!-- 头部导航 -->
+    <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0 shadow-sm z-10">
+      <div class="flex items-center gap-4">
+        <h1 class="text-lg font-semibold text-slate-800">{title}</h1>
+      </div>
+      
+      <div class="flex items-center gap-6">
+        <span class="text-sm text-slate-500 flex items-center gap-2">
+          <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+          系统已连接
+        </span>
+
+        {hasPermission(permissions, 'plugins.manage') && (
+          <a 
+            href="/admin/plugins" 
+            class="text-sm font-medium text-slate-600 hover:text-blue-600 flex items-center gap-1.5 transition-colors no-underline group"
+          >
+            <div class="p-1.5 bg-slate-100 rounded-lg group-hover:bg-blue-50 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plug"><path d="M12 2v8"/><path d="M18 12V7a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v5"/><path d="M6 12h12"/><path d="M12 22v-6.5"/><path d="M9 12v2.5"/><path d="M15 12v2.5"/></svg>
+            </div>
+            插件管理
+          </a>
+        )}
+
+        <form action="/api/auth/admin/logout" method="POST">
+             <button type="submit" class="text-sm font-medium text-slate-600 hover:text-red-600 transition-colors">
+               退出登录
+             </button>
+        </form>
+      </div>
+    </header>
+
+    <!-- 动态内容渲染区 -->
+    <main class="flex-1 overflow-y-auto p-8 relative">
+       <div class="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <slot />
+       </div>
+    </main>
+    <Toaster client:load />
+    <AiFloatingBot client:idle />
+  </body>
+</html>

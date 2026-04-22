@@ -1,0 +1,11 @@
+---
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+import { RolesManagement } from '../../components/admin/RolesManagement';
+import { ErrorBoundary } from '../../components/ui/ErrorBoundary';
+---
+
+<DashboardLayout title="角色权限管理">
+  <ErrorBoundary client:only="react">
+    <RolesManagement client:load />
+  </ErrorBoundary>
+</DashboardLayout>

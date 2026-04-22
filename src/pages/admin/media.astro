@@ -1,0 +1,10 @@
+---
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+import { MediaPicker } from '../../components/admin/MediaPicker';
+---
+
+<DashboardLayout title="附件管理中心">
+  <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+    <MediaPicker client:load mode="manager" title="全站附件中心" />
+  </div>
+</DashboardLayout>

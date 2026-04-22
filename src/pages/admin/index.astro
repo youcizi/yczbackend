@@ -1,0 +1,101 @@
+---
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+import { createDbClient } from '../../db';
+import { InquiryService } from '../../services/InquiryService';
+import { Users, TrendingUp, Clock, ArrowRight } from 'lucide-react';
+
+const runtime = (Astro.locals as any).runtime;
+const db = await createDbClient(runtime?.env?.DB);
+const stats = await InquiryService.getLeadsStats(db);
+---
+
+<DashboardLayout title="管理概览">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 relative overflow-hidden group">
+      <div class="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform">
+         <Users size={48} />
+      </div>
+      <p class="text-sm font-medium text-slate-500 mb-1">总询盘数 (Leads)</p>
+      <div class="flex items-end justify-between">
+        <h3 class="text-3xl font-bold text-slate-900">{stats.total}</h3>
+        <span class="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">累计汇总</span>
+      </div>
+    </div>
+    
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 relative overflow-hidden group">
+      <div class="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform">
+         <Clock size={48} />
+      </div>
+      <p class="text-sm font-medium text-slate-500 mb-1">今日新增 (Today)</p>
+      <div class="flex items-end justify-between">
+        <h3 class="text-3xl font-bold text-slate-900">{stats.today}</h3>
+        <span class="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">实时监控</span>
+      </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 relative overflow-hidden group">
+      <div class="absolute top-0 right-0 p-3 opacity-10 group-hover:scale-110 transition-transform">
+         <TrendingUp size={48} />
+      </div>
+      <p class="text-sm font-medium text-slate-500 mb-1">转化效率</p>
+      <div class="flex items-end justify-between">
+        <h3 class="text-3xl font-bold text-slate-900">{stats.total > 0 ? (stats.today / stats.total * 100).toFixed(1) : 0}%</h3>
+        <span class="text-xs font-medium text-orange-600 bg-orange-50 px-2 py-1 rounded">日活占比</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 space-y-6">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+          <h3 class="font-semibold text-slate-800">高转化页面排行 (Top Converting Pages)</h3>
+          <a href="/admin/leads" class="text-xs text-blue-600 hover:underline flex items-center gap-1">
+             查看详情 <ArrowRight size={10} />
+          </a>
+        </div>
+        <div class="p-6">
+           <div class="space-y-4">
+              {stats.topPages.map((page, index) => (
+                <div key={page.url} class="flex items-center gap-4">
+                   <span class={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${index === 0 ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                      {index + 1}
+                   </span>
+                   <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium text-slate-700 truncate">{page.url}</p>
+                   </div>
+                   <div class="text-sm font-bold text-slate-900">{page.count} 询盘</div>
+                </div>
+              ))}
+              {stats.topPages.length === 0 && <div class="text-center py-6 text-slate-400 text-sm">暂无数据统计</div>}
+           </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+          <h3 class="font-semibold text-slate-800">快捷操作</h3>
+        </div>
+        <div class="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+          <a href="/admin/leads" class="p-4 border border-slate-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-center group">
+             <p class="font-medium text-sm text-slate-700 group-hover:text-blue-600">管理询盘</p>
+          </a>
+          <a href="/admin/collections" class="p-4 border border-slate-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-center group">
+             <p class="font-medium text-sm text-slate-700 group-hover:text-blue-600">调整模型</p>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-blue-600 rounded-xl p-6 text-white shadow-lg shadow-blue-600/20">
+       <h3 class="font-bold text-lg mb-2">线索质量提示</h3>
+       <p class="text-sm text-blue-100 leading-relaxed mb-4">
+         当前系统已开启访客链路追踪。您可以查看具体线索的 <b>Landing Page</b> 和 <b>Visit Count</b> 来判断客户的意向强度。
+       </p>
+       <div class="bg-white/10 p-4 rounded-lg">
+          <p class="text-[10px] uppercase font-bold text-blue-200 mb-2">今日转化最高源</p>
+          <p class="text-sm font-bold truncate">{stats.topPages[0]?.url || '等待数据录入'}</p>
+       </div>
+    </div>
+  </div>
+</DashboardLayout>

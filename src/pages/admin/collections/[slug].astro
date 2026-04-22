@@ -1,0 +1,18 @@
+---
+import DashboardLayout from '../../../layouts/DashboardLayout.astro';
+import { ContentManagement } from '../../../components/admin/ContentManagement';
+import { ErrorBoundary } from '../../../components/ui/ErrorBoundary';
+
+const { slug } = Astro.params;
+const user = Astro.locals.user;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+---
+
+<DashboardLayout title={`集合列表: ${slug}`}>
+  <ErrorBoundary client:only="react">
+    <ContentManagement client:only="react" slug={slug!} />
+  </ErrorBoundary>
+</DashboardLayout>

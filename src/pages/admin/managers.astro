@@ -1,0 +1,11 @@
+---
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+import { ManagersManagement } from '../../components/admin/ManagersManagement';
+import { ErrorBoundary } from '../../components/ui/ErrorBoundary';
+---
+
+<DashboardLayout title="管理员帐户管理">
+  <ErrorBoundary client:only="react">
+    <ManagersManagement client:load />
+  </ErrorBoundary>
+</DashboardLayout>

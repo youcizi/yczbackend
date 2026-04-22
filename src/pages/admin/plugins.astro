@@ -1,0 +1,23 @@
+---
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+import { PluginManagement } from '../../components/admin/PluginManagement';
+
+/**
+ * 插件管理中心
+ * 路径: /admin/plugins
+ * 权限要求: plugins.manage
+ */
+---
+
+<DashboardLayout title="插件管理中心">
+  <div class="mb-8">
+    <div className="flex items-center gap-3 mb-2">
+      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full uppercase tracking-wider">
+        System Core
+      </span>
+      <span className="text-slate-400 text-xs">/ System / Plugins</span>
+    </div>
+  </div>
+
+  <PluginManagement client:load />
+</DashboardLayout>
