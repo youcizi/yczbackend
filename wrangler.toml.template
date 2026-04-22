@@ -31,3 +31,8 @@ DEFAULT_ADMIN_PASSWORD="password"
 
 [observations]
 enabled = true
+
+[env.production.assets]
+directory = "./dist"
+
+main = "dist/_worker.js/index.js"
