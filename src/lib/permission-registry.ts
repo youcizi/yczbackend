@@ -76,22 +76,28 @@ export class PermissionRegistry {
     const registeredSlugsInMem = defs.map(d => d.slug);
 
     try {
-      // 1. 批量写入/更新当前内存中的权限
+      // 1. 批量写入/更新当前内存中的权限 (使用 D1 友好的“查-写”模式代替 onConflict)
       for (const def of defs) {
         try {
-          await db.insert(permissions).values({
-            slug: def.slug,
-            name: def.name,
-            description: def.description,
-            permCategory: def.permCategory
-          }).onConflictDoUpdate({
-            target: permissions.slug,
-            set: {
+          const existing = await db.select().from(permissions).where(eq(permissions.slug, def.slug)).get();
+          
+          if (existing) {
+            await db.update(permissions)
+              .set({
+                name: def.name,
+                description: def.description,
+                permCategory: def.permCategory
+              })
+              .where(eq(permissions.slug, def.slug))
+              .run();
+          } else {
+            await db.insert(permissions).values({
+              slug: def.slug,
               name: def.name,
               description: def.description,
               permCategory: def.permCategory
-            }
-          });
+            }).run();
+          }
         } catch (e) {
           console.warn(`⚠️ [Permission] 同步单个权限失败 (${def.slug}):`, e);
         }

@@ -10,20 +10,17 @@ export const onRequest = defineMiddleware(async (context, next) => {
     let DB: any;
 
     try {
-        // Astro 6 推荐：通过虚拟模块获取环境绑定
+        // 生产与测试环境推荐：通过虚拟模块获取 D1 绑定
         // @ts-ignore
         const cf = await import('cloudflare:workers');
         DB = cf.env?.DB || cf.DB;
     } catch (e) {
-        // 兜底方案：从 locals 提取
+        // 本地/特定构建环境：从 locals 提取
         DB = (locals as any).DB || (locals as any).runtime?.DB;
     }
 
-    if (!DB) {
-        console.warn('⚠️ [Middleware] 仍未发现 D1 绑定，请检查 wrangler.toml。');
-    } else {
-        console.log('✅ [Middleware] D1 绑定提取成功');
-        // [Crucial Fix] 将提取到的 D1 绑定注入 locals，供后续页面使用
+    if (DB) {
+        // [Verified Pattern] 注入 locals 以供后续 Astro 页面使用
         (locals as any).DB = DB;
         if (!(locals as any).runtime) (locals as any).runtime = {};
         (locals as any).runtime.DB = DB;

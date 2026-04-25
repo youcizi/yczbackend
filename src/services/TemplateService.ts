@@ -427,6 +427,8 @@ export class TemplateService {
         }
 
         // 2. 幂等插入 Collection（含 fieldConfig 注入）
+        const [existingColl] = await db.select().from(collections).where(eq(collections.slug, def.slug)).limit(1).all();
+        
         const collectionData = {
           name: def.name === '产品' ? '产品列表' : def.name,
           slug: def.slug,
@@ -435,16 +437,19 @@ export class TemplateService {
           menuOrder: def.menuOrder,
           icon: def.icon,
           description: def.description,
-          // NOTE: 直接注入 fieldConfig，让公有 API、通知钩子、关联字段配置等开箱即用
           fieldConfig: def.fieldConfig || {},
         };
         
-        await db.insert(collections).values(collectionData).onConflictDoNothing().run();
+        if (!existingColl) {
+          await db.insert(collections).values(collectionData).run();
+        } else {
+          // 可选：更新现有 Collection 的配置
+          await db.update(collections).set(collectionData).where(eq(collections.id, existingColl.id)).run();
+        }
 
-        // 3. 权限自愈 (Permission Self-Healing)
+        // 3. 权限登记 (只注册不立即同步，由 Service 统一触发)
         registerDynamicPermissions(collectionData, 'collection');
-        await registry.syncToDb(db);
-        console.log(`📡 [Template] 模块初始化完成: ${def.slug} (fieldConfig 已注入)`);
+        console.log(`📡 [Template] 模块准备就绪: ${def.slug} (fieldConfig 已登记)`);
 
         return { modelId, collectionSlug: def.slug };
       }
@@ -530,7 +535,11 @@ export class TemplateService {
         }
       }
     }
-
+    if (results.length > 0) {
+      console.log(`📡 [Template] 正在执行全量权限同步...`);
+      await registry.syncToDb(db, true);
+    }
+    
     return { success: true, count: results.length, generated: results };
   }
 

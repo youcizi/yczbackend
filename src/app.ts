@@ -30,58 +30,62 @@ let isSynced = false;
  */
 async function performSystemSync(c: any, registry: PermissionRegistry) {
   const db = await createDbClient(c.env.DB);
+  console.log(`📡 [System] 正在启动 Schema Radar (Environment: ${c.env.NODE_ENV || 'local'})...`);
+  
+  // [Schema Migration Radar] 自动补全数据库缺失表与列 (必须在业务查询之前执行)
+  if (c.env.NODE_ENV !== 'production') {
+    try {
+      // 核心 RBAC 架构
+      await db.run(sql`CREATE TABLE IF NOT EXISTS roles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, scope TEXT DEFAULT 'tenant', description TEXT, created_at INTEGER)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS permissions (slug TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, perm_category TEXT)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS role_permissions (role_id INTEGER NOT NULL, permission_slug TEXT NOT NULL, PRIMARY KEY(role_id, permission_slug))`);
+      
+      // 核心模型架构
+      await db.run(sql`CREATE TABLE IF NOT EXISTS models (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, fields_json TEXT NOT NULL, description TEXT, metadata TEXT, created_at INTEGER)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS collections (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, model_id INTEGER NOT NULL, description TEXT, icon TEXT DEFAULT 'Layers', sort INTEGER DEFAULT 0, menu_group TEXT, menu_order INTEGER DEFAULT 0, parent_id INTEGER, relation_settings TEXT, field_config TEXT, permission_config TEXT, metadata TEXT, created_at INTEGER)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS sites (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, domain TEXT UNIQUE NOT NULL, status TEXT DEFAULT 'active', theme_data TEXT, site_config TEXT, metadata TEXT, created_at INTEGER)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS entities (id INTEGER PRIMARY KEY AUTOINCREMENT, collection_id INTEGER NOT NULL, data_json TEXT NOT NULL, locale TEXT DEFAULT 'en-US', translation_group TEXT, created_by TEXT, metadata TEXT, created_at INTEGER, updated_at INTEGER)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS admins (id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, hashed_password TEXT NOT NULL, created_at INTEGER)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS admin_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES admins(id), expires_at INTEGER NOT NULL)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS admins_to_roles (admin_id TEXT NOT NULL, role_id INTEGER NOT NULL, tenant_id INTEGER DEFAULT 0, PRIMARY KEY(admin_id, role_id, tenant_id))`);
+      
+      await db.run(sql`CREATE TABLE IF NOT EXISTS members (id TEXT PRIMARY KEY, email TEXT NOT NULL, password_hash TEXT NOT NULL, tenant_id INTEGER NOT NULL, status TEXT DEFAULT 'active', created_at INTEGER)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS member_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES members(id), expires_at INTEGER NOT NULL)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS languages (code TEXT PRIMARY KEY, name TEXT NOT NULL, status TEXT DEFAULT 'active', is_default INTEGER DEFAULT 0, created_at INTEGER)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS plugins (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT UNIQUE NOT NULL, name TEXT NOT NULL, config TEXT, config_schema TEXT, is_enabled INTEGER DEFAULT 0, created_at INTEGER, updated_at INTEGER)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS media_items (id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT NOT NULL, filename TEXT NOT NULL, mime_type TEXT NOT NULL, size INTEGER NOT NULL, is_remote INTEGER DEFAULT 0, created_by TEXT, metadata TEXT, created_at INTEGER)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, description TEXT, updated_at INTEGER)`);
+
+      // 核心业务：询盘
+      await db.run(sql`CREATE TABLE IF NOT EXISTS inquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, member_id TEXT, email TEXT NOT NULL, content TEXT NOT NULL, verify_token TEXT, status TEXT DEFAULT 'pending', source_url TEXT, metadata TEXT, created_at INTEGER, updated_at INTEGER)`);
+      console.log('✨ [System] Schema Radar: 核心系统表验证完成');
+
+      // 增量字段补全 (自愈)
+      const alters = [
+        `ALTER TABLE inquiries ADD COLUMN source_url TEXT`,
+        `ALTER TABLE roles ADD COLUMN scope TEXT DEFAULT 'tenant'`,
+        `ALTER TABLE admins_to_roles ADD COLUMN tenant_id INTEGER NOT NULL DEFAULT 0`,
+        `ALTER TABLE permissions ADD COLUMN perm_category TEXT`,
+        `ALTER TABLE collections ADD COLUMN menu_group TEXT`,
+        `ALTER TABLE collections ADD COLUMN menu_order INTEGER DEFAULT 0`,
+        `ALTER TABLE collections ADD COLUMN field_config TEXT`
+      ];
+      for (const cmd of alters) {
+        try { await db.run(sql.raw(cmd)); } catch(e) {}
+      }
+    } catch (e) {
+      console.error('❌ [System] Schema Radar 关键错误:', e);
+    }
+  }
+
   registry.initCorePermissions();
 
   // 全量自动扫描业务集合并补全权限
   try {
-    const tableCheck = await db.run(sql`SELECT name FROM sqlite_master WHERE type='table' AND name='collections'`);
-    const tableExists = tableCheck.results && tableCheck.results.length > 0;
-
-    if (tableExists) {
-      const allCollections = await db.select().from(collections).all();
-      allCollections.forEach(item => {
-        registry.registerDynamicPermissions(item, 'collection');
-      });
-    }
-
-    // [Schema Migration Radar] 自动补全数据库缺失表与列 (仅在开发模式通过 SQL 自愈)
-    if (c.env.NODE_ENV === 'development') {
-      try {
-        // 核心 RBAC 架构
-        await db.run(sql`CREATE TABLE IF NOT EXISTS roles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, scope TEXT DEFAULT 'tenant', description TEXT, created_at INTEGER)`);
-        await db.run(sql`CREATE TABLE IF NOT EXISTS permissions (slug TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, perm_category TEXT)`);
-        await db.run(sql`CREATE TABLE IF NOT EXISTS role_permissions (role_id INTEGER NOT NULL, permission_slug TEXT NOT NULL, PRIMARY KEY(role_id, permission_slug))`);
-        
-        // 核心模型架构
-        await db.run(sql`CREATE TABLE IF NOT EXISTS models (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, fields_json TEXT NOT NULL, description TEXT, metadata TEXT, created_at INTEGER)`);
-        await db.run(sql`CREATE TABLE IF NOT EXISTS collections (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, model_id INTEGER NOT NULL, description TEXT, icon TEXT DEFAULT 'Layers', sort INTEGER DEFAULT 0, menu_group TEXT, menu_order INTEGER DEFAULT 0, parent_id INTEGER, relation_settings TEXT, field_config TEXT, permission_config TEXT, metadata TEXT, created_at INTEGER)`);
-        await db.run(sql`CREATE TABLE IF NOT EXISTS sites (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, domain TEXT UNIQUE NOT NULL, status TEXT DEFAULT 'active', theme_data TEXT, site_config TEXT, metadata TEXT, created_at INTEGER)`);
-
-        // 核心业务：询盘
-        await db.run(sql`CREATE TABLE IF NOT EXISTS inquiries (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          site_id INTEGER,
-          form_name TEXT,
-          visitor_id TEXT,
-          email TEXT,
-          phone TEXT,
-          content TEXT,
-          metadata TEXT,
-          source_url TEXT,
-          referrer TEXT,
-          created_at INTEGER
-        )`);
-        console.log('✨ [System] Schema Radar: 核心系统表验证完成');
-      } catch (e) {}
-
-      try {
-        await db.run(sql`ALTER TABLE inquiries ADD COLUMN source_url TEXT`);
-        await db.run(sql`ALTER TABLE roles ADD COLUMN scope TEXT DEFAULT 'tenant'`);
-        await db.run(sql`ALTER TABLE admins_to_roles ADD COLUMN tenant_id INTEGER NOT NULL DEFAULT 0`);
-        await db.run(sql`ALTER TABLE permissions ADD COLUMN perm_category TEXT`);
-        console.log('✨ [System] Schema Radar: 字段补全执行成功');
-      } catch (e) {}
-    }
+    const allCollections = await db.select().from(collections).all();
+    allCollections.forEach(item => {
+      registry.registerDynamicPermissions(item, 'collection');
+    });
 
     // 权威同步落地到数据库 (清理孤儿权限)
     await registry.syncToDb(db, true);
@@ -89,7 +93,6 @@ async function performSystemSync(c: any, registry: PermissionRegistry) {
     console.log('✅ [System] Permission Radar 同步完成。');
   } catch (e) {
     console.warn('⚠️ [System] 动态权限同步跳过 (数据库可能尚未就绪):', e);
-    // 如果失败，允许下次请求重试
     syncPromise = null;
   }
 }

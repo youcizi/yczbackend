@@ -46,10 +46,13 @@ export const seedAdmin = async (d1: any, password?: string) => {
 
   // 3. 最终绑定关系
   console.log(`🔗 [Seed] 正在绑定 'all' 权限到 SuperAdmin...`);
-  await db.insert(rolePermissions).values({
-    roleId: 1,
-    permissionSlug: 'all'
-  }).onConflictDoNothing();
+  const existingRP = await db.select().from(rolePermissions).where(eq(rolePermissions.roleId, 1)).limit(1).get();
+  if (!existingRP) {
+    await db.insert(rolePermissions).values({
+      roleId: 1,
+      permissionSlug: 'all'
+    }).run();
+  }
   console.log("✅ [Seed] 权限绑定完成");
 
   // 4. 获取或创建管理员账号
@@ -62,18 +65,23 @@ export const seedAdmin = async (d1: any, password?: string) => {
     await db.insert(admins).values({
       id: adminId,
       username,
-      hashedPassword,
-    }).onConflictDoNothing();
+      hashedPassword: hashedPassword,
+    }).run();
     existingAdmin = await db.select().from(admins).where(eq(admins.username, username)).get();
   }
 
   // 5. 绑定管理员到角色
   if (existingAdmin) {
-    await db.insert(adminsToRoles).values({
-      adminId: existingAdmin.id,
-      roleId: 1,
-      tenantId: 0
-    }).onConflictDoNothing();
+    const existingBinding = await db.select().from(adminsToRoles)
+      .where(eq(adminsToRoles.adminId, existingAdmin.id))
+      .get();
+    if (!existingBinding) {
+      await db.insert(adminsToRoles).values({
+        adminId: existingAdmin.id,
+        roleId: 1,
+        tenantId: 0
+      }).run();
+    }
   }
 
   // 6. 初始化默认语种 (en-US, zh-CN)
