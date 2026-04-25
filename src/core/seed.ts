@@ -17,27 +17,40 @@ export const seedAdmin = async (d1: any, password?: string) => {
 
   console.log("🌱 [Seed] 开始初始化动态 RBAC 系统...");
 
-  // 1. 注册并同步核心权限
-  initCorePermissions();
-  await registry.syncToDb(db);
-
-  // 2. 创建超级管理员角色 (如果不存在)
-  let superRole = await db.select().from(roles).where(eq(roles.name, 'SuperAdmin')).get();
-  
-  if (!superRole) {
-    const [inserted] = await db.insert(roles).values({
-      name: 'SuperAdmin',
-      description: '系统最高权限组'
-    }).returning();
-    superRole = inserted;
-    console.log("✅ [Seed] 创建超级管理员角色成功");
+  // 1. 显式确保 'all' 权限存在 (避免 ON CONFLICT 语法兼容性问题)
+  const existingAll = await db.select().from(permissions).where(eq(permissions.slug, 'all')).get();
+  if (!existingAll) {
+    await db.insert(permissions).values({
+      slug: 'all',
+      name: '所有权限',
+      permCategory: 'core'
+    });
+    console.log("✅ [Seed] 核心权限 'all' 载入成功");
   }
 
-  // 3. 为超级管理员角色绑定 'all' 权限
+  // 2. 显式创建/更新超级管理员角色 (ID: 1)
+  const existingRole = await db.select().from(roles).where(eq(roles.id, 1)).get();
+  if (!existingRole) {
+    await db.insert(roles).values({
+      id: 1,
+      name: 'SuperAdmin',
+      description: '系统最高权限组',
+      scope: 'system'
+    });
+    console.log("✅ [Seed] 超级管理员角色 'SuperAdmin' 创建成功");
+  }
+
+  // 同步其他动态权限
+  initCorePermissions();
+  await registry.syncToDb(db, true);
+
+  // 3. 最终绑定关系
+  console.log(`🔗 [Seed] 正在绑定 'all' 权限到 SuperAdmin...`);
   await db.insert(rolePermissions).values({
-    roleId: superRole.id,
+    roleId: 1,
     permissionSlug: 'all'
   }).onConflictDoNothing();
+  console.log("✅ [Seed] 权限绑定完成");
 
   // 4. 获取或创建管理员账号
   const adminId = "super-admin-01";
@@ -58,7 +71,7 @@ export const seedAdmin = async (d1: any, password?: string) => {
   if (existingAdmin) {
     await db.insert(adminsToRoles).values({
       adminId: existingAdmin.id,
-      roleId: superRole.id,
+      roleId: 1,
       tenantId: 0
     }).onConflictDoNothing();
   }

@@ -5,8 +5,15 @@ import { createDbClient } from '../../../db';
 import { getAdminPermissions } from '../../../lib/rbac';
 
 const user = Astro.locals.user;
-const runtime = (Astro.locals as any).runtime;
-const db = await createDbClient(runtime?.env?.DB);
+let DB: any;
+try {
+  // @ts-ignore
+  const cf = await import('cloudflare:workers');
+  DB = cf.env.DB;
+} catch (e) {
+  DB = (Astro.locals as any).runtime?.DB;
+}
+const db = await createDbClient(DB);
 const permissions = await getAdminPermissions(db, user?.id);
 
 // NOTE: 常规设置使用独立的 settings.general 权限，无需 role.manage 级别

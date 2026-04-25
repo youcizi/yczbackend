@@ -1,4 +1,6 @@
 import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { members } from './schema/members';
+import { inquiries } from './schema/inquiries';
 export * from './schema/members';
 export * from './schema/inquiries';
 

@@ -4,9 +4,10 @@ import { createDbClient } from '../../db';
 import { InquiryService } from '../../services/InquiryService';
 import { Users, TrendingUp, Clock, ArrowRight } from 'lucide-react';
 
-const runtime = (Astro.locals as any).runtime;
-const db = await createDbClient(runtime?.env?.DB);
-const stats = await InquiryService.getLeadsStats(db);
+const runtime = (Astro.locals as any).runtime || {};
+const DB = runtime.DB || (Astro.locals as any).DB;
+const db = await createDbClient(DB);
+const stats = await InquiryService.getLeadsStats(db).catch(() => ({ total: 0, today: 0, topPages: [] }));
 ---
 
 <DashboardLayout title="管理概览">
