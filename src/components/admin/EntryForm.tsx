@@ -12,7 +12,7 @@ import {
   DialogTrigger,
   DialogClose
 } from '../ui/Dialog';
-import { type ModelField } from '../../lib/model-engine';
+import { type ModelField, validateEntityData } from '../../lib/model-engine';
 import { AlertCircle, Image as ImageIcon, FileJson, Type, Hash, AlignLeft, Search, Loader2, ArrowRight, Braces, Plus, Trash2, X, File as FileIcon, ChevronDown, ChevronRight, CheckCircle2, Globe, Check } from 'lucide-react';
 import { AdvancedJSONEditor } from './AdvancedJSONEditor';
 import { TiptapEditor } from './TiptapEditor';
@@ -495,9 +495,9 @@ export const EntryForm: React.FC<EntryFormProps> = ({
       
       // 执行 Merge 操作：保留原有数据，补全模板 Key
       const currentSpecData = formData.spec_data || {};
-      const newSpecData = { ...templateConfig, ...currentSpecData };
+      const nextSpecData = { ...templateConfig, ...currentSpecData };
       
-      handleChange('spec_data', newSpecData);
+      handleChange('spec_data', nextSpecData);
       toast({ title: '模板已应用', description: `已注入 ${Object.keys(templateConfig).length} 条规格定义` });
     } catch (err) {
       toast({ title: '应用失败', description: '无法获取模板配置', variant: 'destructive' });
@@ -507,16 +507,49 @@ export const EntryForm: React.FC<EntryFormProps> = ({
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
+    
     try {
-      // 1. 组装批处理 Payload (纠正嵌套结构: 业务字段必须放入 dataJson)
       const currentFinalMap = { ...translationsMap, [currentLocale]: formData };
+      
+      // 1. 前端全量校验 (针对所有已填写的语言版本)
+      const allErrors: Record<string, string> = {};
+      let firstErrorLocale = '';
+
+      for (const [locale, data] of Object.entries(currentFinalMap)) {
+        // 判定依据：如果该语言包没有任何业务字段，则跳过校验（因为它不会被保存）
+        const businessKeys = Object.keys(data).filter(k => !['id', 'locale', 'translationGroup', 'createdBy', 'createdAt', 'updatedAt', '_displayValues'].includes(k));
+        if (businessKeys.length === 0) continue;
+
+        const validation = validateEntityData(data, fields);
+        if (!validation.valid) {
+          if (locale === currentLocale) {
+            validation.errors.forEach(msg => {
+              const field = fields.find(f => msg.includes(`[${f.label}]`));
+              if (field) allErrors[field.name] = msg;
+            });
+          }
+          if (!firstErrorLocale) firstErrorLocale = locale;
+        }
+      }
+
+      if (Object.keys(allErrors).length > 0 || firstErrorLocale) {
+        setErrors(allErrors);
+        toast({ 
+          title: '校验未通过', 
+          description: `语种 [${firstErrorLocale}] 的必填项尚未填写完整，请检查。`, 
+          variant: 'destructive' 
+        });
+        return; // 拦截请求
+      }
+
+      // 2. 组装批处理 Payload (纠正嵌套结构: 业务字段必须放入 dataJson)
       const batchPayload = Object.values(currentFinalMap).filter((item: any) => {
         // 判定依据：排除只有元数据的空白草稿
-        const keys = Object.keys(item).filter(k => !['id', 'locale', 'translationGroup', 'createdBy', 'createdAt', 'updatedAt'].includes(k));
+        const keys = Object.keys(item).filter(k => !['id', 'locale', 'translationGroup', 'createdBy', 'createdAt', 'updatedAt', '_displayValues'].includes(k));
         return keys.length > 0; 
       }).map((item: any) => {
         // 核心纠正：将业务字段归集到 dataJson 属性中发送
-        const { id, locale, translationGroup, ...businessData } = item;
+        const { id, locale, translationGroup, _displayValues, ...businessData } = item;
         return {
           id,
           locale,

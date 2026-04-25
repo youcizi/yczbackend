@@ -695,74 +695,65 @@ entitiesRouter.post('/:slug/batch-save', dynamicGuard, async (c) => {
      commonGroup = crypto.randomUUID();
   }
 
-  try {
-    const results: any[] = [];
-    
-    // 适配层：针对 SQLite 驱动手动控制事务，避开 Transaction 返回 Promise 的报错
-    const isD1 = typeof (db as any).batch === 'function';
-    
-    if (isD1) {
-      // D1 生产环境：支持 async transaction
-      await db.transaction(async (tx) => {
-        for (const entry of payload) {
-          const data = entry.dataJson || {};
-          const businessKeys = Object.keys(data).filter(k => !['id', 'locale', 'translationGroup', 'createdBy'].includes(k));
-          if (businessKeys.length === 0 && !entry.id) continue;
+    try {
+    const actualConfig = collection.fieldConfig || collection.relationSettings || {};
+    const batchOps: any[] = [];
+    const metaResults: any[] = [];
 
-          const actualConfig = collection.fieldConfig || collection.relationSettings || {};
-          const enumValidation = sanitizeAndValidateEnums(data, model.fieldsJson as any[], actualConfig);
-          if (!enumValidation.valid) throw new Error(`[${entry.locale}]选项结构错误: ${enumValidation.errors.join(';')}`);
+    // 1. 预处理与校验
+    for (const entry of payload) {
+      const data = entry.dataJson || {};
+      const businessKeys = Object.keys(data).filter(k => !['id', 'locale', 'translationGroup', 'createdBy'].includes(k));
+      if (businessKeys.length === 0 && !entry.id) continue;
 
-          const validation = validateEntityData(data, model.fieldsJson as any[]);
-          if (!validation.valid) throw new Error(`[${entry.locale}] 格式校验失败: ${validation.errors.join('; ')}`);
+      // 执行业务校验 (枚举/必填)
+      const enumValidation = sanitizeAndValidateEnums(data, model.fieldsJson as any[], actualConfig);
+      if (!enumValidation.valid) throw new Error(`[${entry.locale}] 选项结构错误: ${enumValidation.errors.join(';')}`);
+      
+      const validation = validateEntityData(data, model.fieldsJson as any[]);
+      if (!validation.valid) throw new Error(`数据校验失败: ${validation.errors.join('; ')}`);
 
-          if (entry.id) {
-            await tx.update(entities).set({ dataJson: data, updatedAt: new Date(), translationGroup: commonGroup }).where(and(eq(entities.id, parseInt(entry.id)), eq(entities.collectionId, collection.id)));
-            results.push({ locale: entry.locale, id: parseInt(entry.id), translationGroup: commonGroup });
-          } else {
-            const [inserted] = await tx.insert(entities).values({ collectionId: collection.id, dataJson: data, locale: entry.locale, translationGroup: commonGroup, createdBy: user?.id }).returning();
-            results.push({ locale: entry.locale, id: inserted.id, translationGroup: commonGroup });
-          }
+      if (entry.id) {
+        batchOps.push(
+          db.update(entities)
+            .set({ dataJson: data, updatedAt: new Date(), translationGroup: commonGroup })
+            .where(and(eq(entities.id, parseInt(entry.id)), eq(entities.collectionId, collection.id)))
+        );
+        metaResults.push({ locale: entry.locale, id: parseInt(entry.id), translationGroup: commonGroup });
+      } else {
+        batchOps.push(
+          db.insert(entities).values({
+            collectionId: collection.id,
+            dataJson: data,
+            locale: entry.locale,
+            translationGroup: commonGroup,
+            createdBy: user?.id
+          }).returning()
+        );
+        metaResults.push({ locale: entry.locale, needsId: true, translationGroup: commonGroup });
+      }
+    }
+
+    // 2. 执行原子批处理 (Cloudflare D1 最佳实践)
+    if (batchOps.length > 0) {
+      const batchResults = await db.batch(batchOps as any);
+      
+      // 回填新增记录的真实 ID (如果有的话)
+      metaResults.forEach((meta, idx) => {
+        if (meta.needsId) {
+          const inserted = batchResults[idx];
+          // D1 batch 返回的通常是结果数组的子集
+          const rowData = Array.isArray(inserted) ? inserted[0] : inserted;
+          meta.id = rowData?.id;
+          delete meta.needsId;
         }
       });
-    } else {
-      // [修复关键]：本地 SQLite 环境，手动控制显式事务
-      try {
-        // 使用 drizzle 的 run/execute 发送同步指令
-        await db.run(sql`BEGIN TRANSACTION`);
-        
-        for (const entry of payload) {
-          const data = entry.dataJson || {};
-          const businessKeys = Object.keys(data).filter(k => !['id', 'locale', 'translationGroup', 'createdBy'].includes(k));
-          if (businessKeys.length === 0 && !entry.id) continue;
-
-          const actualConfig = collection.fieldConfig || collection.relationSettings || {};
-          const enumValidation = sanitizeAndValidateEnums(data, model.fieldsJson as any[], actualConfig);
-          if (!enumValidation.valid) throw new Error(`[${entry.locale}]选项结构错误: ${enumValidation.errors.join(';')}`);
-          
-          const validation = validateEntityData(data, model.fieldsJson as any[]);
-          if (!validation.valid) throw new Error(`[${entry.locale}] 格式校验失败: ${validation.errors.join('; ')}`);
-
-          if (entry.id) {
-            await db.update(entities).set({ dataJson: data, updatedAt: new Date(), translationGroup: commonGroup }).where(and(eq(entities.id, parseInt(entry.id)), eq(entities.collectionId, collection.id)));
-            results.push({ locale: entry.locale, id: parseInt(entry.id), translationGroup: commonGroup });
-          } else {
-            const [inserted] = await db.insert(entities).values({ collectionId: collection.id, dataJson: data, locale: entry.locale, translationGroup: commonGroup, createdBy: user?.id }).returning();
-            results.push({ locale: entry.locale, id: inserted.id, translationGroup: commonGroup });
-          }
-        }
-        
-        await db.run(sql`COMMIT`);
-      } catch (e) {
-        await db.run(sql`ROLLBACK`);
-        throw e;
-      }
     }
 
     return c.json({ 
       success: true, 
       translationGroup: commonGroup,
-      list: results 
+      list: metaResults 
     });
 
   } catch (err: any) {
