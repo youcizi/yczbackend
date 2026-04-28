@@ -143,8 +143,11 @@ admin.patch('/config', async (c) => {
   }
 
   try {
-    // 这里我们将原本基于 ID 的 update 封装为基于 Slug 的 Service 方法
-    await PluginService.updatePluginConfigBySlug(db, slug, config);
+    const { slug, name, description, config } = await c.req.json();
+    if (!slug) return c.json({ error: '缺少插件标识' }, 400);
+
+    // 调用升级后的元数据更新方法
+    await PluginService.updatePluginMetadataBySlug(db, slug, { name, description, config });
     return c.json({ success: true });
   } catch (err: any) {
     return c.json({ success: false, error: err.message }, 400);

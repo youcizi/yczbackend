@@ -12,6 +12,7 @@ interface PluginPageContainerProps {
  */
 export const PluginPageContainer: React.FC<PluginPageContainerProps> = ({ slug }) => {
   const [status, setStatus] = useState<{ isEnabled: boolean; isInstalled: boolean } | null>(null);
+  const [manifest, setManifest] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,6 +22,7 @@ export const PluginPageContainer: React.FC<PluginPageContainerProps> = ({ slug }
     const checkStatus = async () => {
       setLoading(true);
       try {
+        // 1. 校验数据库状态
         const res = await fetch('/api/v1/plugins/admin/available');
         if (!res.ok) throw new Error('无法校验插件运行状态');
         const { data } = await res.json();
@@ -30,6 +32,12 @@ export const PluginPageContainer: React.FC<PluginPageContainerProps> = ({ slug }
           setError('PLUGIN_NOT_REGISTERED');
         } else {
           setStatus({ isEnabled: p.isEnabled, isInstalled: p.isInstalled });
+          
+          // 2. 异步拉取代码清单 (Manifest)
+          if (bundle) {
+            const m = await bundle.getManifest();
+            setManifest(m);
+          }
         }
       } catch (err: any) {
         setError(err.message);
@@ -39,7 +47,7 @@ export const PluginPageContainer: React.FC<PluginPageContainerProps> = ({ slug }
     };
 
     checkStatus();
-  }, [slug]);
+  }, [slug, bundle]);
 
   // Loading 占位
   if (loading) {
@@ -73,7 +81,7 @@ export const PluginPageContainer: React.FC<PluginPageContainerProps> = ({ slug }
         </div>
         <h3 className="text-xl font-black text-slate-800 tracking-tight">插件功能已冻结</h3>
         <p className="text-sm text-slate-500 mt-2 max-w-sm text-center px-8 leading-relaxed">
-           管理员已在“插件管理”中心停用了 <strong>{bundle.manifest.name}</strong> 的所有运行入口。请先开启该插件后再尝试访问。
+           管理员已在“插件管理”中心停用了 <strong>{manifest?.name || slug}</strong> 的所有运行入口。请先开启该插件后再尝试访问。
         </p>
         <div className="mt-8">
            <a href="/admin/plugins" className="px-6 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all">

@@ -64,6 +64,8 @@ export const PluginManagement: React.FC = () => {
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const [editingPlugin, setEditingPlugin] = useState<PluginMetadata | null>(null);
   const [editingConfig, setEditingConfig] = useState<any>({});
+  const [editingName, setEditingName] = useState('');
+  const [editingDescription, setEditingDescription] = useState('');
   
   const { toast } = useToast();
 
@@ -172,6 +174,8 @@ export const PluginManagement: React.FC = () => {
   const openConfig = (plugin: PluginMetadata) => {
     setEditingPlugin(plugin);
     setEditingConfig(plugin.config || {});
+    setEditingName(plugin.name || '');
+    setEditingDescription(plugin.description || '');
     setConfigModalOpen(true);
   };
 
@@ -182,7 +186,12 @@ export const PluginManagement: React.FC = () => {
       const res = await fetch('/api/v1/plugins/admin/config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug: editingPlugin.slug, config: editingConfig })
+        body: JSON.stringify({ 
+          slug: editingPlugin.slug, 
+          name: editingName,
+          description: editingDescription,
+          config: editingConfig 
+        })
       });
 
       if (!res.ok) {
@@ -190,7 +199,7 @@ export const PluginManagement: React.FC = () => {
         throw new Error(d.error || '保存失败');
       }
       
-      toast({ title: "配置热更新成功", description: "新参数已通过持久化层应用。" });
+      toast({ title: "配置热更新成功", description: "名称、描述及 JSON 参数已同步应用。" });
       setConfigModalOpen(false);
       await fetchPlugins();
     } catch (err: any) {
@@ -266,7 +275,18 @@ export const PluginManagement: React.FC = () => {
                   <TableRow key={plugin.slug} className="group hover:bg-slate-50/50 transition-colors">
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="font-bold text-slate-700">{plugin.name}</span>
+                        {plugin.isEnabled ? (
+                          <a 
+                            href={`/admin/plugins/${plugin.slug}`}
+                            className="font-bold text-slate-800 hover:text-blue-600 hover:underline transition-all decoration-blue-300 underline-offset-4"
+                          >
+                            {plugin.name}
+                          </a>
+                        ) : (
+                          <span className="font-bold text-slate-400 cursor-not-allowed italic">
+                            {plugin.name} (已挂起)
+                          </span>
+                        )}
                         <div className="flex items-center gap-2 mt-1.5">
                           <code className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono border border-slate-200">
                             {plugin.slug}
@@ -340,16 +360,32 @@ export const PluginManagement: React.FC = () => {
       )}
 
       {/* 说明区域 */}
-      <div className="bg-slate-100/50 border border-slate-200 rounded-xl p-5 flex gap-4 items-start">
-        <Terminal className="text-slate-500 shrink-0 mt-0.5" size={20} />
-        <div className="text-xs text-slate-600 leading-relaxed space-y-2">
-          <p className="font-bold text-slate-800">开发者指南:</p>
-          <ol className="list-decimal list-inside space-y-1 ml-1">
-             <li>在 <code>src/plugins/</code> 下建立文件夹并编写业务代码。</li>
-             <li>在 <code>src/lib/plugin-registry.ts</code> 中注册代码映射。</li>
-             <li>在此页面点击“手动登记插件”，填入对应的 Slug 标识。</li>
-             <li>开启“运行”开关，系统将自动挂载路由代理并下发权限条目。</li>
-          </ol>
+      <div className="bg-slate-100/80 border border-slate-200 rounded-2xl p-6 flex gap-5 items-start">
+        <Terminal className="text-blue-500 shrink-0 mt-0.5" size={24} />
+        <div className="text-xs text-slate-600 leading-relaxed space-y-3">
+          <p className="font-bold text-slate-800 text-sm">💡 资产管理中心 - 开发者与管理员指南</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <p className="font-semibold text-slate-700 flex items-center gap-1.5 underline decoration-blue-200 underline-offset-4">
+                <Code size={14}/> 什么是高级初始化配置 (JSON)？
+              </p>
+              <p>
+                这相当于插件的 <b>“环境变量”</b>。开发者可以在此定义插件运行所需的外部参数
+                （如 API 密钥、资源重定向路径等），实现 <b>“代码不动，配置先行”</b>。系统会在插件启动时自动注入这些配置。
+              </p>
+            </div>
+            <div className="space-y-2">
+              <p className="font-semibold text-slate-700 flex items-center gap-1.5 underline decoration-blue-200 underline-offset-4">
+                <Puzzle size={14}/> 插件集成工作流
+              </p>
+              <p>
+                1. 在 <code>src/plugins/</code> 创建子目录。<br/>
+                2. 遵循目录契约 (需具备 <code>manifest.ts</code>, <code>index.ts</code>, <code>admin/index.tsx</code>)。<br/>
+                3. 重启 dev 环境触发自动扫描，系统将生成代码桥接文件。<br/>
+                4. 在此页面点击<b>手动登记</b>并激活，开启路由代理与 RBAC 权限联动。
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -440,11 +476,43 @@ export const PluginManagement: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-2">
-            <AdvancedJSONEditor 
-              value={editingConfig} 
-              onChange={setEditingConfig} 
-            />
+          <div className="p-6 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+               <div className="space-y-2">
+                 <Label className="text-[11px] font-bold uppercase text-slate-400">插件显示名称</Label>
+                 <Input 
+                   value={editingName} 
+                   onChange={e => setEditingName(e.target.value)}
+                   className="bg-slate-50 border-slate-200 focus:ring-blue-500" 
+                 />
+               </div>
+               <div className="space-y-2">
+                 <Label className="text-[11px] font-bold uppercase text-slate-400">资源定位 Slug</Label>
+                 <Input value={editingPlugin?.slug} disabled className="bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed font-mono" />
+               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[11px] font-bold uppercase text-slate-400">功能简述</Label>
+              <Input 
+                 value={editingDescription} 
+                 onChange={e => setEditingDescription(e.target.value)}
+                 className="bg-slate-50 border-slate-200 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="space-y-2 border-t border-slate-100 pt-4">
+              <Label className="text-[11px] font-bold uppercase text-slate-400 flex items-center gap-1.5">
+                <Code size={14} className="text-blue-500" />
+                运行时环境变量 (JSON Params)
+              </Label>
+              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-inner">
+                <AdvancedJSONEditor 
+                  value={editingConfig} 
+                  onChange={setEditingConfig} 
+                />
+              </div>
+            </div>
           </div>
 
           <DialogFooter className="bg-slate-50 -mx-6 -mb-6 p-4 mt-4 rounded-b-2xl border-t border-slate-100">

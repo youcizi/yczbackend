@@ -215,11 +215,16 @@ export class PluginService {
   }
 
   /**
-   * 更新插件配置 (基于 Slug)
+   * 更新插件全量元数据 (名称、描述、配置)
    */
-  static async updatePluginConfigBySlug(db: any, slug: string, config: any) {
+  static async updatePluginMetadataBySlug(db: any, slug: string, data: { name?: string; description?: string; config?: any }) {
     await db.update(plugins)
-      .set({ config, updatedAt: new Date() })
+      .set({ 
+        name: data.name,
+        description: data.description,
+        config: data.config, 
+        updatedAt: new Date() 
+      })
       .where(eq(plugins.slug, slug))
       .run();
     
