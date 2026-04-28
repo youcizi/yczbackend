@@ -57,6 +57,7 @@ export const permissions = sqliteTable('permissions', {
   name: text('name').notNull(),
   description: text('description'),
   permCategory: text('perm_category'), // 所属模块归类
+  pluginSlug: text('plugin_slug'),     // 逻辑归属：null 代表核心系统 | slug 代表所属插件
 });
 
 /**

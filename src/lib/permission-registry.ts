@@ -6,6 +6,7 @@ export interface PermissionDef {
   name: string;
   description?: string;
   permCategory: string;
+  pluginSlug?: string | null;
 }
 
 const CORE_PERMISSIONS: PermissionDef[] = [
@@ -63,7 +64,7 @@ export class PermissionRegistry {
       return;
     }
     this.pendingPermissions.set(def.slug, def);
-    console.log(`📡 [Permission] 已登记权限: ${def.slug} (${def.name})`);
+    // console.log(`📡 [Permission] 已登记权限: ${def.slug} (${def.name}) [Plugin: ${def.pluginSlug || 'CORE'}]`);
   }
 
   /**
@@ -86,7 +87,8 @@ export class PermissionRegistry {
               .set({
                 name: def.name,
                 description: def.description,
-                permCategory: def.permCategory
+                permCategory: def.permCategory,
+                pluginSlug: def.pluginSlug ?? existing.pluginSlug // 保持现有归属或更新
               })
               .where(eq(permissions.slug, def.slug))
               .run();
@@ -95,7 +97,8 @@ export class PermissionRegistry {
               slug: def.slug,
               name: def.name,
               description: def.description,
-              permCategory: def.permCategory
+              permCategory: def.permCategory,
+              pluginSlug: def.pluginSlug || null
             }).run();
           }
         } catch (e) {
@@ -109,9 +112,10 @@ export class PermissionRegistry {
         const dbPermissions = await db.select().from(permissions).all();
         
         // B. 动态构建“物理合法”权限白名单 (内存记录 + 核心权限)
-        // 注意：如果不依赖内存，可以直接从 collections/models 表实时生成合法 Slugs
         const activeCollections = await db.select({ slug: collections.slug }).from(collections).all();
         const activeModels = await db.select({ slug: models.slug }).from(models).all();
+        const allPluginsInDb = await db.select({ slug: plugins.slug }).from(plugins).all();
+        const pluginSlugsInDb = new Set(allPluginsInDb.map((p: any) => p.slug));
         
         const legalDynamicSlugs = [
           ...activeCollections.flatMap(c => [`collection:${c.slug}:view`, `collection:${c.slug}:edit`, `collection:${c.slug}:delete`]),
@@ -120,8 +124,14 @@ export class PermissionRegistry {
 
         const allLegalSlugs = new Set([...CORE_SLUGS, ...registeredSlugsInMem, ...legalDynamicSlugs]);
 
-        // C. 识别孤儿
-        const orphans = dbPermissions.filter((p: any) => !allLegalSlugs.has(p.slug));
+        // C. 识别孤儿：
+        // 只有当：1. 不在合法池中 且 2. (不属于任何已知插件 或 物理代码已彻底丢失) 时才会被清理
+        const orphans = dbPermissions.filter((p: any) => {
+          if (allLegalSlugs.has(p.slug)) return false;
+          // 如果权限标记了归属插件，但该插件还在数据库里，我们就不物理删除它（仅隐藏）
+          if (p.pluginSlug && pluginSlugsInDb.has(p.pluginSlug)) return false;
+          return true;
+        });
         
         console.log(`📡 [Permission] 权威同步审计: DB(${dbPermissions.length}), 合法池(${allLegalSlugs.size}), 命中孤儿(${orphans.length})`);
 
@@ -194,6 +204,7 @@ export class PermissionRegistry {
         name: p.name,
         description: p.description,
         permCategory: `Plugin: ${plugin.name}`,
+        pluginSlug: plugin.slug, // 核心修复：注入归属插件标识
       });
     });
   }

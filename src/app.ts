@@ -37,7 +37,7 @@ async function performSystemSync(c: any, registry: PermissionRegistry) {
     try {
       // 核心 RBAC 架构
       await db.run(sql`CREATE TABLE IF NOT EXISTS roles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, scope TEXT DEFAULT 'tenant', description TEXT, created_at INTEGER)`);
-      await db.run(sql`CREATE TABLE IF NOT EXISTS permissions (slug TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, perm_category TEXT)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS permissions (slug TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, perm_category TEXT, plugin_slug TEXT)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS role_permissions (role_id INTEGER NOT NULL, permission_slug TEXT NOT NULL, PRIMARY KEY(role_id, permission_slug))`);
 
       // 核心模型架构
@@ -66,6 +66,7 @@ async function performSystemSync(c: any, registry: PermissionRegistry) {
         `ALTER TABLE roles ADD COLUMN scope TEXT DEFAULT 'tenant'`,
         `ALTER TABLE admins_to_roles ADD COLUMN tenant_id INTEGER NOT NULL DEFAULT 0`,
         `ALTER TABLE permissions ADD COLUMN perm_category TEXT`,
+        `ALTER TABLE permissions ADD COLUMN plugin_slug TEXT`,
         `ALTER TABLE collections ADD COLUMN menu_group TEXT`,
         `ALTER TABLE collections ADD COLUMN menu_order INTEGER DEFAULT 0`,
         `ALTER TABLE collections ADD COLUMN field_config TEXT`

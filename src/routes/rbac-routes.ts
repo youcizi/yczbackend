@@ -92,16 +92,29 @@ rbac.delete('/languages/:code', async (c) => {
 });
 
 /**
- * 1. 权限列表 (从 Registry 获取最新的所有可用权限)
+ * 1. 权限列表 (联动插件激活状态过滤)
  */
 rbac.get('/permissions', async (c) => {
   const db = await createDbClient(c.env.DB);
-  // 直接从数据库获取所有权限，确保动态生成的权限（如新建集合）能即时可见
-  // 按分类（permCategory）和标识（slug）排序，确保前端展示整齐有序
-  const allPerms = await db.select()
+  const { plugins: pluginsTable } = await import('../db/schema');
+  
+  // 核心逻辑：仅展示核心权限，或已启用插件带来的权限
+  const allPerms = await db.select({
+    slug: permissions.slug,
+    name: permissions.name,
+    description: permissions.description,
+    permCategory: permissions.permCategory,
+    pluginSlug: permissions.pluginSlug,
+    pluginEnabled: pluginsTable.isEnabled
+  })
     .from(permissions)
+    .leftJoin(pluginsTable, eq(permissions.pluginSlug, pluginsTable.slug))
+    .where(
+      sql`${permissions.pluginSlug} IS NULL OR ${pluginsTable.isEnabled} = 1`
+    )
     .orderBy(permissions.permCategory, permissions.slug)
     .all();
+
   return c.json(allPerms);
 });
 
