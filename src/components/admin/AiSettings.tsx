@@ -14,8 +14,9 @@ import {
 import { 
   Save, RefreshCw, Layers, Plus, Trash2, Edit2,
   Settings2, Code2, Cpu, Image as ImageIcon,
-  CheckCircle2, AlertCircle, Globe, Key
+  CheckCircle2, AlertCircle, Globe, Key, Info
 } from 'lucide-react';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 
 interface Model {
   id: string;
@@ -61,6 +62,10 @@ export const AiSettings: React.FC = () => {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
+
+  // 删除确认 Modal 状态
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const { toast } = useToast();
 
@@ -125,10 +130,18 @@ export const AiSettings: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  const deleteProvider = (id: string) => {
-    if (!confirm('确定要删除该提供商吗？相关模型分配也将失效。')) return;
+  const executeDeleteProvider = () => {
+    if (!deleteTargetId) return;
+    const id = deleteTargetId;
     const newConfig = { ...config, providers: config.providers.filter(p => p.id !== id) };
     handleSave(newConfig);
+    setDeleteConfirmOpen(false);
+    setDeleteTargetId(null);
+  };
+
+  const deleteProvider = (id: string) => {
+    setDeleteTargetId(id);
+    setDeleteConfirmOpen(true);
   };
 
   return (
@@ -404,6 +417,17 @@ export const AiSettings: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="移除 AI 提供商"
+        description="确定要删除该模型提供商吗？删除后，所有基于该供应商的模型分配（包括文本、绘图引擎及场景映射）将立即失效且不可找回。"
+        onConfirm={executeDeleteProvider}
+        variant="destructive"
+        confirmText="确认彻底删除"
+        isLoading={loading}
+      />
     </div>
   );
 };

@@ -25,6 +25,7 @@ import {
   Globe
 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Input } from '../ui/Input';
 import { buildTree, flattenTreeWithPrefix } from '../../lib/tree-utils';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
@@ -67,6 +68,10 @@ export const ApiManagement: React.FC = () => {
   // 配置项相关
   const [configTarget, setConfigTarget] = useState<Collection | null>(null);
   const [docTarget, setDocTarget] = useState<Collection | null>(null);
+
+  // 批量操作确认弹窗
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [batchTarget, setBatchTarget] = useState<boolean | null>(null);
 
   const { toast } = useToast();
 
@@ -117,9 +122,12 @@ export const ApiManagement: React.FC = () => {
     }
   };
 
-  const handleBatchToggle = async (enabled: boolean) => {
-    if (!confirm(`确定要${enabled ? '一键开启' : '一键关闭'}所有业务集合的公共 API 吗？`)) return;
+  const handleExecuteBatchToggle = async () => {
+    if (batchTarget === null) return;
+    const enabled = batchTarget;
+    
     setSaving(true);
+    setConfirmOpen(false);
     try {
       // 串行执行以保证数据库稳定性，虽然 D1 支持并发，但此处安全第一
       for (const c of collections) {
@@ -141,7 +149,13 @@ export const ApiManagement: React.FC = () => {
       toast({ variant: 'destructive', title: '批量操作部分失败', description: e.message });
     } finally {
       setSaving(false);
+      setBatchTarget(null);
     }
+  };
+
+  const handleBatchToggle = (enabled: boolean) => {
+    setBatchTarget(enabled);
+    setConfirmOpen(true);
   };
 
   const copyToClipboard = (text: string) => {
@@ -336,6 +350,19 @@ export const ApiManagement: React.FC = () => {
       <ApiDocDialog 
         collection={docTarget}
         onClose={() => setDocTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title={batchTarget ? "全量开启接口 API" : "全量停止接口 API"}
+        description={batchTarget 
+          ? "确定要一键开启所有业务集合的公共访问权限吗？开启后，这些集合的数据将可能被外界直接读取。" 
+          : "确定要一键关闭所有业务集合的公共访问权限吗？这会导致所有外部前端应用无法通过公共接口获取数据。"}
+        onConfirm={handleExecuteBatchToggle}
+        variant={batchTarget ? "default" : "destructive"}
+        confirmText={batchTarget ? "确认全量开启" : "确认全量关闭"}
+        isLoading={saving}
       />
     </div>
   );

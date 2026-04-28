@@ -10,8 +10,10 @@ import {
   PlusCircle,
   Trash2,
   Terminal,
-  Code
+  Code,
+  Info
 } from 'lucide-react';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { 
   Table, 
   TableBody, 
@@ -66,6 +68,10 @@ export const PluginManagement: React.FC = () => {
   const [editingConfig, setEditingConfig] = useState<any>({});
   const [editingName, setEditingName] = useState('');
   const [editingDescription, setEditingDescription] = useState('');
+
+  // 确认删除 Modal 状态
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmSlug, setConfirmSlug] = useState<string | null>(null);
   
   const { toast } = useToast();
 
@@ -112,10 +118,12 @@ export const PluginManagement: React.FC = () => {
     }
   };
 
-  const handleUninstall = async (slug: string) => {
-    if (!confirm(`确定要移除插件记录 "${slug}" 吗？这不会删除物理代码，但会移除所有配置与权限映射。`)) return;
+  const handleUninstall = async () => {
+    if (!confirmSlug) return;
+    const slug = confirmSlug;
     
     setProcessingSlug(slug);
+    setConfirmOpen(false);
     try {
       const res = await fetch('/api/v1/plugins/admin/uninstall', {
         method: 'DELETE',
@@ -131,7 +139,13 @@ export const PluginManagement: React.FC = () => {
       toast({ title: "操作错误", description: err.message, variant: "destructive" });
     } finally {
       setProcessingSlug(null);
+      setConfirmSlug(null);
     }
+  };
+
+  const triggerUninstallConfirm = (slug: string) => {
+    setConfirmSlug(slug);
+    setConfirmOpen(true);
   };
 
   const togglePlugin = async (slug: string, currentStatus: boolean) => {
@@ -343,7 +357,7 @@ export const PluginManagement: React.FC = () => {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-slate-300 hover:text-red-500 transition-colors ml-1"
-                          onClick={() => handleUninstall(plugin.slug)}
+                          onClick={() => triggerUninstallConfirm(plugin.slug)}
                           disabled={processingSlug === plugin.slug}
                           title="从数据库中移除登记记录"
                         >
@@ -529,6 +543,17 @@ export const PluginManagement: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="移除插件登记"
+        description={`确定要移除插件记录 "${confirmSlug}" 吗？注意：这不会删除物理文件夹，但会清除该插件的所有数据库配置、权限定义及 RBAC 映射。`}
+        onConfirm={handleUninstall}
+        variant="destructive"
+        confirmText="确认物理移除"
+        isLoading={processingSlug === confirmSlug}
+      />
     </div>
   );
 };
