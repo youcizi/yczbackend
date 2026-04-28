@@ -144,6 +144,8 @@ export const PluginManagement: React.FC = () => {
       if (!res.ok) throw new Error('状态切换失败');
       
       const nextStatus = !currentStatus;
+      
+      // 乐观更新 UI
       setPlugins(prev => prev.map(p => 
         p.slug === slug ? { ...p, isEnabled: nextStatus } : p
       ));
@@ -153,9 +155,15 @@ export const PluginManagement: React.FC = () => {
         description: nextStatus ? "权限已自动注入，侧边栏菜单已同步。" : "相关功能入口已关闭。"
       });
 
+      // 发送全局事件，让 Sidebar 等组件刷新
       window.dispatchEvent(new CustomEvent('plugins-updated'));
+      
+      // 关键：重新拉取最新数据库状态，确保 UI 逻辑与后端完全对齐
+      await fetchPlugins();
     } catch (err: any) {
       toast({ title: "切换失败", description: err.message, variant: "destructive" });
+      // 失败时回滚或刷新
+      await fetchPlugins();
     } finally {
       setProcessingSlug(null);
     }

@@ -36,7 +36,7 @@ admin.get('/available', async (c) => {
       version: bundle?.manifest.version || 'v1.0.0',
       author: bundle?.manifest.author || 'Unknown',
       isInstalled: true,
-      isEnabled: p.isEnabled === 1,
+      isEnabled: !!p.isEnabled,
       dbId: p.id,
       isCodePresent: !!bundle
     };

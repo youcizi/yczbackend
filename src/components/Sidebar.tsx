@@ -91,6 +91,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
     }
   }, []);
 
+  // 监听全局插件更新事件
+  useEffect(() => {
+    const handlePluginUpdate = () => {
+      console.log('📡 [Sidebar] Received plugins-updated event, refreshing menus...');
+      if (hasPermission(permissions, 'plugins.manage')) {
+        refreshPlugins();
+      }
+    };
+
+    window.addEventListener('plugins-updated', handlePluginUpdate);
+    return () => window.removeEventListener('plugins-updated', handlePluginUpdate);
+  }, [permissions, refreshPlugins]);
+
   useEffect(() => {
     if (hasPermission(permissions, 'plugins.manage')) {
       refreshPlugins();
