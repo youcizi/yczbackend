@@ -3,6 +3,7 @@ import { members } from './schema/members';
 import { inquiries } from './schema/inquiries';
 export * from './schema/members';
 export * from './schema/inquiries';
+export * from './schema/membership';
 
 /**
  * 站点配置表

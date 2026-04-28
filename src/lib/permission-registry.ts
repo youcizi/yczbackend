@@ -185,6 +185,20 @@ export class PermissionRegistry {
   }
 
   /**
+   * 注册插件预定义权限
+   */
+  public registerPluginPermissions(plugin: { slug: string, name: string }, manifestPerms: any[]) {
+    manifestPerms.forEach(p => {
+      this.register({
+        slug: p.slug,
+        name: p.name,
+        description: p.description,
+        permCategory: `Plugin: ${plugin.name}`,
+      });
+    });
+  }
+
+  /**
    * 动态模型/集合权限映射器
    */
   public registerDynamicPermissions(item: { slug: string, name: string }, type: 'entity' | 'collection') {

@@ -1,0 +1,211 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.4 [39m[90mD:/ycz_me/backend[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+[90mstdout[2m | src/tests/integration/membership-visibility.test.ts[2m > [22m[2m插件挂载与可见性 E2E 测试 (TDD Step 5)[2m > [22m[2m1. 自动注册审计：Service 应能正确向数据库持久化插件元数据
+[22m[39m🧹 [Permission] 注册表已清空
+📡 [Permission] 已登记权限: all (超级权限)
+📡 [Permission] 已登记权限: admin.manage (管理员管理)
+📡 [Permission] 已登记权限: role.manage (角色权限管理)
+📡 [Permission] 已登记权限: languages.manage (多语言管理)
+📡 [Permission] 已登记权限: plugins.manage (插件管理)
+📡 [Permission] 已登记权限: site.view (查看站点)
+📡 [Permission] 已登记权限: site.edit (编辑站点)
+📡 [Permission] 已登记权限: site.delete (删除站点)
+📡 [Permission] 已登记权限: site.init (初始化站点)
+📡 [Permission] 已登记权限: media.manage (附件管理)
+📡 [Permission] 已登记权限: leads.view (查看线索)
+📡 [Permission] 已登记权限: leads.manage (管理线索)
+📡 [Permission] 已登记权限: settings.general (常规设置)
+📡 [Permission] 已登记权限: settings.mail (邮件服务配置)
+📡 [Permission] 已登记权限: settings.ai (AI 网关配置)
+
+[90mstdout[2m | src/tests/integration/membership-visibility.test.ts[2m > [22m[2m插件挂载与可见性 E2E 测试 (TDD Step 5)[2m > [22m[2m2. 侧边栏挂载：通过侧边栏接口展示插件入口
+[22m[39m🧹 [Permission] 注册表已清空
+📡 [Permission] 已登记权限: all (超级权限)
+📡 [Permission] 已登记权限: admin.manage (管理员管理)
+📡 [Permission] 已登记权限: role.manage (角色权限管理)
+📡 [Permission] 已登记权限: languages.manage (多语言管理)
+📡 [Permission] 已登记权限: plugins.manage (插件管理)
+📡 [Permission] 已登记权限: site.view (查看站点)
+📡 [Permission] 已登记权限: site.edit (编辑站点)
+📡 [Permission] 已登记权限: site.delete (删除站点)
+📡 [Permission] 已登记权限: site.init (初始化站点)
+📡 [Permission] 已登记权限: media.manage (附件管理)
+📡 [Permission] 已登记权限: leads.view (查看线索)
+📡 [Permission] 已登记权限: leads.manage (管理线索)
+📡 [Permission] 已登记权限: settings.general (常规设置)
+📡 [Permission] 已登记权限: settings.mail (邮件服务配置)
+📡 [Permission] 已登记权限: settings.ai (AI 网关配置)
+
+ [31m❯[39m src/tests/integration/membership-visibility.test.ts [2m([22m[2m2 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 240[2mms[22m[39m
+[31m     [31m×[31m 1. 自动注册审计：Service 应能正确向数据库持久化插件元数据[39m[32m 136[2mms[22m[39m
+[31m     [31m×[31m 2. 侧边栏挂载：通过侧边栏接口展示插件入口[39m[32m 102[2mms[22m[39m
+Failed to parse file:///D:/ycz_me/backend/src/middleware.ts. Excluding it from coverage.
+ Error [RolldownError]: Parse failed with 1 error:
+Expected a semicolon or an implicit semicolon after a statement, but found none
+ 8: export const onRequest = defineMiddleware(async (context, next) => {
+ 9:     const { cookies, redirect, locals, url, request } = context;
+10:     let DB: any;
+              ^
+11: 
+12:     try {
+    at error (file:///D:/ycz_me/backend/node_modules/.pnpm/rolldown@1.0.0-rc.15/node_modules/rolldown/dist/shared/logs-D80CXhvg.mjs:147:24)
+    at normalizeParseError (file:///D:/ycz_me/backend/node_modules/.pnpm/rolldown@1.0.0-rc.15/node_modules/rolldown/dist/parse-ast-index.mjs:25:9)
+    at wrap (file:///D:/ycz_me/backend/node_modules/.pnpm/rolldown@1.0.0-rc.15/node_modules/rolldown/dist/parse-ast-index.mjs:5:39)
+    at parseAstAsync (file:///D:/ycz_me/backend/node_modules/.pnpm/rolldown@1.0.0-rc.15/node_modules/rolldown/dist/parse-ast-index.mjs:54:9)
+    at V8CoverageProvider.remapCoverage (file:///D:/ycz_me/backend/node_modules/.pnpm/@vitest+coverage-v8@4.1.4_vitest@4.1.4/node_modules/@vitest/coverage-v8/dist/provider.js:133:10)
+    at file:///D:/ycz_me/backend/node_modules/.pnpm/@vitest+coverage-v8@4.1.4_vitest@4.1.4/node_modules/@vitest/coverage-v8/dist/provider.js:119:23
+    at async Promise.all (index 1)
+    at V8CoverageProvider.getCoverageMapForUncoveredFiles (file:///D:/ycz_me/backend/node_modules/.pnpm/@vitest+coverage-v8@4.1.4_vitest@4.1.4/node_modules/@vitest/coverage-v8/dist/provider.js:109:4)
+    at V8CoverageProvider.generateCoverage (file:///D:/ycz_me/backend/node_modules/.pnpm/@vitest+coverage-v8@4.1.4_vitest@4.1.4/node_modules/@vitest/coverage-v8/dist/provider.js:56:29)
+    at file:///D:/ycz_me/backend/node_modules/.pnpm/vitest@4.1.4_@types+node@25_731417b9eefa4eedeefb6541e5dd5c79/node_modules/vitest/dist/chunks/cli-api.lDy4N9kC.js:13580:23 {
+  code: 'PARSE_ERROR',
+  id: undefined,
+  pos: 288
+}
+Failed to parse file:///D:/ycz_me/backend/src/pages/api/[...path].ts. Excluding it from coverage.
+ Error [RolldownError]: Parse failed with 1 error:
+Expected `from` but found `{`
+1: import type { APIRoute } from 'astro';
+               ^
+2: import { app } from '../../app';
+    at error (file:///D:/ycz_me/backend/node_modules/.pnpm/rolldown@1.0.0-rc.15/node_modules/rolldown/dist/shared/logs-D80CXhvg.mjs:147:24)
+    at normalizeParseError (file:///D:/ycz_me/backend/node_modules/.pnpm/rolldown@1.0.0-rc.15/node_modules/rolldown/dist/parse-ast-index.mjs:25:9)
+    at wrap (file:///D:/ycz_me/backend/node_modules/.pnpm/rolldown@1.0.0-rc.15/node_modules/rolldown/dist/parse-ast-index.mjs:5:39)
+    at parseAstAsync (file:///D:/ycz_me/backend/node_modules/.pnpm/rolldown@1.0.0-rc.15/node_modules/rolldown/dist/parse-ast-index.mjs:54:9)
+    at V8CoverageProvider.remapCoverage (file:///D:/ycz_me/backend/node_modules/.pnpm/@vitest+coverage-v8@4.1.4_vitest@4.1.4/node_modules/@vitest/coverage-v8/dist/provider.js:133:10)
+    at file:///D:/ycz_me/backend/node_modules/.pnpm/@vitest+coverage-v8@4.1.4_vitest@4.1.4/node_modules/@vitest/coverage-v8/dist/provider.js:119:23
+    at async Promise.all (index 2)
+    at V8CoverageProvider.getCoverageMapForUncoveredFiles (file:///D:/ycz_me/backend/node_modules/.pnpm/@vitest+coverage-v8@4.1.4_vitest@4.1.4/node_modules/@vitest/coverage-v8/dist/provider.js:109:4)
+    at V8CoverageProvider.generateCoverage (file:///D:/ycz_me/backend/node_modules/.pnpm/@vitest+coverage-v8@4.1.4_vitest@4.1.4/node_modules/@vitest/coverage-v8/dist/provider.js:56:29)
+    at file:///D:/ycz_me/backend/node_modules/.pnpm/vitest@4.1.4_@types+node@25_731417b9eefa4eedeefb6541e5dd5c79/node_modules/vitest/dist/chunks/cli-api.lDy4N9kC.js:13580:23 {
+  code: 'PARSE_ERROR',
+  id: undefined,
+  pos: 12
+}
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/tests/integration/membership-visibility.test.ts[2m > [22m插件挂载与可见性 E2E 测试 (TDD Step 5)[2m > [22m1. 自动注册审计：Service 应能正确向数据库持久化插件元数据
+[41m[1m FAIL [22m[49m src/tests/integration/membership-visibility.test.ts[2m > [22m插件挂载与可见性 E2E 测试 (TDD Step 5)[2m > [22m2. 侧边栏挂载：通过侧边栏接口展示插件入口
+[31m[1mSqliteError[22m: UNIQUE constraint failed: roles.name[39m
+[36m [2m❯[22m src/tests/integration/membership-visibility.test.ts:[2m29:93[22m[39m
+    [90m 27|[39m     [35mconst[39m hp [33m=[39m [35mawait[39m passwordHasher[33m.[39m[34mhash[39m([32m'admin-pass'[39m)[33m;[39m
+    [90m 28|[39m     rawDb.prepare("INSERT INTO admins (id, username, hashed_password) …
+    [90m 29|[39m     rawDb.prepare("INSERT INTO roles (id, name, scope) VALUES (1, 'Sup…
+    [90m   |[39m                                                                                             [31m^[39m
+    [90m 30|[39m     rawDb.prepare("INSERT INTO admins_to_roles (admin_id, role_id, ten…
+    [90m 31|[39m     [35mawait[39m testRegistry[33m.[39m[34msyncToDb[39m(db[33m,[39m [35mfalse[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m   Start at [22m 13:50:39
+[2m   Duration [22m 3.37s[2m (transform 419ms, setup 109ms, import 998ms, tests 240ms, environment 797ms)[22m
+
+[34m % [39m[2mCoverage report from [22m[33mv8[39m
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |    3.46 |     0.09 |     4.4 |    3.75 |                   
+ src               |   29.09 |     3.03 |   22.22 |   29.62 |                   
+  app.ts           |   29.09 |     3.03 |   22.22 |   29.62 | ...95-208,214-228 
+  env.d.ts         |       0 |        0 |       0 |       0 |                   
+ src/components    |       0 |        0 |       0 |       0 |                   
+  ...sionGuard.tsx |       0 |        0 |       0 |       0 | 15-27             
+  Sidebar.tsx      |       0 |        0 |       0 |       0 | 29-395            
+ ...mponents/admin |       0 |        0 |       0 |       0 |                   
+  ...SONEditor.tsx |       0 |        0 |       0 |       0 | 36-366            
+  AiSettings.tsx   |       0 |        0 |       0 |       0 | 47-511            
+  ...anagement.tsx |       0 |        0 |       0 |       0 | 57-631            
+  ...anagement.tsx |       0 |        0 |       0 |       0 | 51-1019           
+  ...anagement.tsx |       0 |        0 |       0 |       0 | 34-565            
+  EntryForm.tsx    |       0 |        0 |       0 |       0 | 27-1049           
+  ...lSettings.tsx |       0 |        0 |       0 |       0 | 11-219            
+  ...ectEditor.tsx |       0 |        0 |       0 |       0 | 27-260            
+  ...anagement.tsx |       0 |        0 |       0 |       0 | 35-301            
+  LeadsCenter.tsx  |       0 |        0 |       0 |       0 | 25-260            
+  MailSettings.tsx |       0 |        0 |       0 |       0 | 8-151             
+  ...anagement.tsx |       0 |        0 |       0 |       0 | 39-454            
+  MediaPicker.tsx  |       0 |        0 |       0 |       0 | 58-430            
+  ...anagement.tsx |       0 |      100 |       0 |       0 | 10-28             
+  ...anagement.tsx |       0 |        0 |       0 |       0 | 53-513            
+  ...ssionGrid.tsx |       0 |        0 |       0 |       0 | 25-107            
+  ...anagement.tsx |       0 |        0 |       0 |       0 | 44-280            
+  ...anagement.tsx |       0 |        0 |       0 |       0 | 48-346            
+  ...ateWizard.tsx |       0 |        0 |       0 |       0 | 46-308            
+  TiptapEditor.tsx |       0 |        0 |       0 |       0 | 46-406            
+ src/components/ai |       0 |        0 |       0 |       0 |                   
+  ...oatingBot.tsx |       0 |        0 |       0 |       0 | 9-91              
+  ChatWindow.tsx   |       0 |        0 |       0 |       0 | 14-151            
+ src/components/ui |       0 |        0 |       0 |       0 |                   
+  Badge.tsx        |       0 |      100 |       0 |       0 | 5-30              
+  Button.tsx       |       0 |        0 |       0 |       0 | 7-60              
+  Card.tsx         |       0 |      100 |       0 |       0 | 4-76              
+  Checkbox.tsx     |       0 |      100 |       0 |       0 | 6-40              
+  Dialog.tsx       |       0 |      100 |       0 |       0 | 6-103             
+  ...rBoundary.tsx |       0 |        0 |       0 |       0 | 18-68             
+  Input.tsx        |       0 |      100 |       0 |       0 | 7-22              
+  Label.tsx        |       0 |      100 |       0 |       0 | 7-22              
+  Select.tsx       |       0 |        0 |       0 |       0 | 9-68              
+  Sheet.tsx        |       0 |        0 |       0 |       0 | 7-121             
+  Skeleton.tsx     |       0 |      100 |       0 |       0 | 8                 
+  Switch.tsx       |       0 |      100 |       0 |       0 | 5-24              
+  Table.tsx        |       0 |      100 |       0 |       0 | 4-96              
+  Toast.tsx        |       0 |      100 |       0 |       0 | 7-110             
+  Toaster.tsx      |       0 |        0 |       0 |       0 | 21-155            
+ src/core          |    2.17 |        0 |       0 |    2.17 |                   
+  seed.ts          |    2.77 |        0 |       0 |    2.77 | 11-98             
+  system.ts        |       0 |        0 |       0 |       0 | 15-41             
+ src/lib           |   11.15 |      1.4 |   19.67 |   11.01 |                   
+  SeoUtils.ts      |       0 |        0 |   66.66 |       0 | 10-34             
+  auth.ts          |      25 |      100 |      20 |      25 | 12,21-59          
+  config.ts        |      20 |        0 |       0 |      20 | 34-48             
+  model-engine.ts  |       0 |        0 |       0 |       0 | 40-135            
+  ...n-registry.ts |   29.03 |    15.38 |      35 |   28.57 | ...76,191-198,215 
+  rbac.test.ts     |       0 |      100 |       0 |       0 | 4-35              
+  rbac.ts          |   11.11 |        0 |      10 |   12.82 | ...5,54-85,96-101 
+  ...ge-service.ts |       0 |        0 |     100 |       0 | 19-41             
+  tree-utils.ts    |       0 |        0 |       0 |       0 | 25-114            
+  utils.ts         |       0 |      100 |       0 |       0 | 5                 
+ src/middleware    |    6.18 |        0 |   16.66 |    6.45 |                   
+  dispatch.ts      |    8.51 |        0 |       0 |     9.3 | 26-65,72-107      
+  memberAuth.ts    |       0 |        0 |       0 |       0 | 7-53              
+  rbac.ts          |     7.4 |        0 |      50 |     7.4 | 11-58             
+ ...digital-worker |       0 |      100 |       0 |       0 |                   
+  index.ts         |       0 |      100 |       0 |       0 | 7-26              
+ ...ins/membership |       0 |        0 |       0 |       0 |                   
+  index.ts         |       0 |        0 |       0 |       0 | 11-75             
+ src/routes        |    6.94 |        0 |       0 |    7.54 |                   
+  ai.ts            |    6.25 |        0 |       0 |    6.84 | ...49-116,124-167 
+  api-v1.ts        |   26.92 |        0 |       0 |   30.43 | 10-14,19-32,36-45 
+  auth.ts          |    7.93 |        0 |       0 |    8.19 | ...,90-98,105-143 
+  crm.ts           |   15.62 |        0 |       0 |   16.12 | ...32,38-43,49-64 
+  entities.ts      |    2.27 |        0 |       0 |    2.57 | ...18-664,676-761 
+  infra.ts         |     8.1 |        0 |       0 |    8.82 | 10-45,53-80       
+  media.ts         |   11.39 |        0 |       0 |   12.16 | ...62-189,198-200 
+  public-api.ts    |    5.15 |        0 |       0 |    5.46 | ...20-400,405-496 
+  rbac-routes.ts   |    7.67 |        0 |       0 |    8.28 | ...86-706,711-738 
+  settings.ts      |    9.89 |        0 |       0 |   10.34 | ...81-194,199-222 
+  webhooks.ts      |      60 |      100 |       0 |     100 |                   
+ src/routes/api/v1 |    9.58 |        0 |       0 |    9.85 |                   
+  plugins.ts       |    9.58 |        0 |       0 |    9.85 | ...02-118,128-171 
+ src/scripts       |       0 |        0 |       0 |       0 |                   
+  ...up-orphans.ts |       0 |        0 |       0 |       0 | 9-36              
+ src/services      |       1 |        0 |   44.44 |    1.08 |                   
+  ...ingService.ts |       0 |        0 |   33.33 |       0 | 13-57             
+  ...areService.ts |    1.85 |        0 |   85.71 |    2.04 | 14-168            
+  ...wayManager.ts |    5.88 |        0 |     100 |    5.88 | 16-71             
+  ImageProxy.ts    |       0 |        0 |     100 |       0 | 16-70             
+  ...iryService.ts |       0 |        0 |      50 |       0 | 13-225            
+  ...uthService.ts |       0 |        0 |       0 |       0 | 19-96             
+  ...hipService.ts |       0 |        0 |       0 |       0 | 15-172            
+  NotifyService.ts |       0 |        0 |      30 |       0 | 6-148             
+  PluginService.ts |       0 |        0 |     100 |       0 | 16-145            
+  RbacService.ts   |       0 |        0 |   28.57 |       0 | 17-75             
+  SeoService.ts    |       0 |        0 |      50 |       0 | 12-73             
+  ...ateService.ts |    2.81 |        0 |   23.52 |    3.12 | 377-550           
+-------------------|---------|----------|---------|---------|-------------------

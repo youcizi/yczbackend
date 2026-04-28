@@ -1,5 +1,6 @@
-import { eq } from 'drizzle-orm';
-import { plugins } from '../db/schema';
+import { eq, inArray } from 'drizzle-orm';
+import { plugins, permissions } from '../db/schema';
+import { PLUGIN_CODE_REGISTRY } from '../lib/plugin-registry';
 
 /**
  * 插件管理服务
@@ -58,6 +59,158 @@ export class PluginService {
       .set({ isEnabled, updatedAt: new Date() })
       .where(eq(plugins.id, id))
       .run();
+  }
+
+  /**
+   * 安装插件
+   */
+  static async installPlugin(db: any, slug: string, metadata: { name: string; description?: string; author?: string }) {
+    return await this.registerPlugin(db, {
+      slug,
+      name: metadata.name,
+      description: metadata.description || '',
+      version: '1.0.0',
+      author: metadata.author || '',
+      isEnabled: true // 默认安装即激活
+    });
+  }
+
+  /**
+   * 卸载插件 (仅删除元数据)
+   */
+  static async uninstallPlugin(db: any, slug: string) {
+    await db.delete(plugins).where(eq(plugins.slug, slug)).run();
+    await this.clearCache();
+    return true;
+  }
+
+  /**
+   * 切换启禁用状态
+   */
+  static async togglePlugin(db: any, slug: string, enabled: boolean) {
+    // 修正: Drizzle mode: boolean 期待 boolean 类型
+    await db.update(plugins)
+      .set({ isEnabled: enabled, updatedAt: new Date() })
+      .where(eq(plugins.slug, slug))
+      .run();
+
+    if (enabled) {
+      const bundle = PLUGIN_CODE_REGISTRY[slug];
+      if (bundle && bundle.manifest.permissions) {
+        // 动态注入到内存注册表
+        const { registry } = await import('../lib/permission-registry');
+        registry.registerPluginPermissions({ slug, name: bundle.manifest.name }, bundle.manifest.permissions);
+        // 执行同步到 DB
+        await registry.syncToDb(db, true);
+      }
+    }
+
+    await this.clearCache();
+    return true;
+  }
+
+  /**
+   * 获取所有已启用插件的管理后台菜单
+   */
+  static async getAdminMenus(db: any) {
+    const enabledPlugins = await this.getEnabledPlugins(db);
+    const menus = [];
+
+    for (const p of enabledPlugins) {
+      const bundle = PLUGIN_CODE_REGISTRY[p.slug];
+      if (bundle && bundle.manifest.adminMenu) {
+        menus.push({
+          ...bundle.manifest.adminMenu,
+          slug: p.slug
+        });
+      }
+    }
+
+    return menus;
+  }
+
+  /**
+   * 手动登记新插件 (供管理后台使用)
+   */
+  static async registerPluginManually(db: any, data: { slug: string; name: string; description: string }) {
+    // 1. 验证代码是否存在于注册表
+    const bundle = PLUGIN_CODE_REGISTRY[data.slug];
+    if (!bundle) {
+      throw new Error(`[代码认证失败] 在 src/plugins/ 未找到 slug 为 "${data.slug}" 的插件代码。请先在代码层面完成导入。`);
+    }
+
+    const manifest = bundle.manifest;
+
+    // 2. 插入元数据
+    const result = await this.registerPlugin(db, {
+      slug: data.slug,
+      name: data.name || manifest.name,
+      description: data.description || manifest.description,
+      version: manifest.version,
+      author: manifest.author,
+      isEnabled: false // 初始默认为停用，需手动激活
+    });
+
+    return result;
+  }
+
+  /**
+   * 注册/更新插件元数据 (内部调用)
+   */
+  static async registerPlugin(db: any, data: { 
+    slug: string; 
+    name: string; 
+    description: string; 
+    version: string; 
+    author: string;
+    isEnabled?: boolean;
+  }) {
+    // Upsert 逻辑
+    const existing = await db.select().from(plugins).where(eq(plugins.slug, data.slug)).get();
+    
+    if (existing) {
+      await db.update(plugins)
+        .set({
+          name: data.name,
+          description: data.description,
+          version: data.version,
+          author: data.author,
+          isEnabled: data.isEnabled ?? existing.isEnabled,
+          updatedAt: new Date(),
+        })
+        .where(eq(plugins.slug, data.slug))
+        .run();
+    } else {
+      await db.insert(plugins).values({
+        slug: data.slug,
+        name: data.name,
+        description: data.description,
+        version: data.version,
+        author: data.author,
+        isEnabled: data.isEnabled ?? true,
+        configSchema: {}
+      }).run();
+    }
+    
+    await this.clearCache();
+    return true;
+  }
+
+  private static async clearCache() {
+    // @ts-ignore
+    this.cache = null;
+  }
+
+  /**
+   * 更新插件配置 (基于 Slug)
+   */
+  static async updatePluginConfigBySlug(db: any, slug: string, config: any) {
+    await db.update(plugins)
+      .set({ config, updatedAt: new Date() })
+      .where(eq(plugins.slug, slug))
+      .run();
+    
+    await this.clearCache();
   }
 
   /**

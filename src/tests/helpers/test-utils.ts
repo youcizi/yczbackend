@@ -183,10 +183,48 @@ export function createTestDb() {
       slug TEXT UNIQUE NOT NULL, 
       name TEXT NOT NULL, 
       config TEXT, 
+      config_schema TEXT,
       is_enabled INTEGER DEFAULT 0, 
       created_at INTEGER, 
       updated_at INTEGER
     );
+
+    -- Membership Plugin Tables
+    CREATE TABLE IF NOT EXISTS p_member_profiles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL,
+      member_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      avatar TEXT,
+      phone TEXT,
+      tier_id INTEGER,
+      account_type TEXT DEFAULT 'individual',
+      created_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS p_profile_tenant_idx ON p_member_profiles (tenant_id, member_id);
+
+    CREATE TABLE IF NOT EXISTS p_member_addresses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL,
+      member_id TEXT NOT NULL,
+      country_code TEXT DEFAULT 'CN',
+      province TEXT,
+      city TEXT,
+      district TEXT,
+      detail TEXT NOT NULL,
+      is_default INTEGER DEFAULT 0,
+      created_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS p_address_tenant_idx ON p_member_addresses (tenant_id, member_id);
+
+    CREATE TABLE IF NOT EXISTS p_member_tiers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      discount_rate INTEGER DEFAULT 100,
+      created_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS p_tier_tenant_idx ON p_member_tiers (tenant_id);
   `;
   
   sqlite.exec(schemaSql);

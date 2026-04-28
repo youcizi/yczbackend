@@ -1,0 +1,31 @@
+---
+import DashboardLayout from '../../../layouts/DashboardLayout.astro';
+import { PluginPageContainer } from '../../../components/admin/PluginPageContainer';
+
+export function getStaticPaths() {
+  // 注意：在 Workers 模式（SSR）下，通常不需要 getStaticPaths，
+  // 但如果是静态生成模式，这里可以留空或动态获取。
+  // 本项目为 SSR 模式。
+  return [];
+}
+
+const { slug } = Astro.params;
+
+/**
+ * 动态插件管理页面
+ * 路径: /admin/plugins/:slug
+ */
+---
+
+<DashboardLayout title={`插件管理: ${slug}`}>
+  <div class="mb-6">
+    <div className="flex items-center gap-3 mb-2">
+      <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded-full uppercase tracking-wider">
+        External Plugin
+      </span>
+      <span className="text-slate-400 text-xs">/ System / Plugins / {slug}</span>
+    </div>
+  </div>
+
+  <PluginPageContainer slug={slug!} client:load />
+</DashboardLayout>

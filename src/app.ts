@@ -87,6 +87,22 @@ async function performSystemSync(c: any, registry: PermissionRegistry) {
       registry.registerDynamicPermissions(item, 'collection');
     });
 
+    // --- 新增：扫描并同步已启用的插件权限 ---
+    try {
+      const { PluginService } = await import('./services/PluginService');
+      const { PLUGIN_CODE_REGISTRY } = await import('./lib/plugin-registry');
+      
+      const enabledPlugins = await PluginService.getEnabledPlugins(db);
+      for (const p of enabledPlugins) {
+        const bundle = PLUGIN_CODE_REGISTRY[p.slug];
+        if (bundle && bundle.manifest.permissions) {
+          registry.registerPluginPermissions(p, bundle.manifest.permissions);
+        }
+      }
+    } catch (pluginError) {
+      console.warn('⚠️ [System] 插件权限预热失败:', pluginError);
+    }
+
     // 权威同步落地到数据库 (清理孤儿权限)
     await registry.syncToDb(db, true);
     isSynced = true;

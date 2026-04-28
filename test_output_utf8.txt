@@ -1,0 +1,179 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.4 [39m[90mD:/ycz_me/backend[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+ [31m❯[39m src/tests/unit/membership-pricing.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 29[2mms[22m[39m
+[31m     [31m×[31m 1. 折扣路径：VIP 会员输入 100 元应返回 85 元[39m[32m 22[2mms[22m[39m
+     [32m✓[39m 2. 原价路径：无等级会员输入 100 元应返回 100 元[32m 3[2mms[22m[39m
+     [32m✓[39m 3. 安全路径：禁止跨租户获取折扣 (租户 2 尝试用租户 1 的等级 ID)[32m 2[2mms[22m[39m
+Failed to parse file:///D:/ycz_me/backend/src/middleware.ts. Excluding it from coverage.
+ Error [RolldownError]: Parse failed with 1 error:
+Expected a semicolon or an implicit semicolon after a statement, but found none
+ 8: export const onRequest = defineMiddleware(async (context, next) => {
+ 9:     const { cookies, redirect, locals, url, request } = context;
+10:     let DB: any;
+              ^
+11: 
+12:     try {
+    at error (file:///D:/ycz_me/backend/node_modules/.pnpm/rolldown@1.0.0-rc.15/node_modules/rolldown/dist/shared/logs-D80CXhvg.mjs:147:24)
+    at normalizeParseError (file:///D:/ycz_me/backend/node_modules/.pnpm/rolldown@1.0.0-rc.15/node_modules/rolldown/dist/parse-ast-index.mjs:25:9)
+    at wrap (file:///D:/ycz_me/backend/node_modules/.pnpm/rolldown@1.0.0-rc.15/node_modules/rolldown/dist/parse-ast-index.mjs:5:39)
+    at parseAstAsync (file:///D:/ycz_me/backend/node_modules/.pnpm/rolldown@1.0.0-rc.15/node_modules/rolldown/dist/parse-ast-index.mjs:54:9)
+    at V8CoverageProvider.remapCoverage (file:///D:/ycz_me/backend/node_modules/.pnpm/@vitest+coverage-v8@4.1.4_vitest@4.1.4/node_modules/@vitest/coverage-v8/dist/provider.js:133:10)
+    at file:///D:/ycz_me/backend/node_modules/.pnpm/@vitest+coverage-v8@4.1.4_vitest@4.1.4/node_modules/@vitest/coverage-v8/dist/provider.js:119:23
+    at async Promise.all (index 2)
+    at V8CoverageProvider.getCoverageMapForUncoveredFiles (file:///D:/ycz_me/backend/node_modules/.pnpm/@vitest+coverage-v8@4.1.4_vitest@4.1.4/node_modules/@vitest/coverage-v8/dist/provider.js:109:4)
+    at V8CoverageProvider.generateCoverage (file:///D:/ycz_me/backend/node_modules/.pnpm/@vitest+coverage-v8@4.1.4_vitest@4.1.4/node_modules/@vitest/coverage-v8/dist/provider.js:56:29)
+    at file:///D:/ycz_me/backend/node_modules/.pnpm/vitest@4.1.4_@types+node@25_731417b9eefa4eedeefb6541e5dd5c79/node_modules/vitest/dist/chunks/cli-api.lDy4N9kC.js:13580:23 {
+  code: 'PARSE_ERROR',
+  id: undefined,
+  pos: 288
+}
+Failed to parse file:///D:/ycz_me/backend/src/pages/api/[...path].ts. Excluding it from coverage.
+ Error [RolldownError]: Parse failed with 1 error:
+Expected `from` but found `{`
+1: import type { APIRoute } from 'astro';
+               ^
+2: import { app } from '../../app';
+    at error (file:///D:/ycz_me/backend/node_modules/.pnpm/rolldown@1.0.0-rc.15/node_modules/rolldown/dist/shared/logs-D80CXhvg.mjs:147:24)
+    at normalizeParseError (file:///D:/ycz_me/backend/node_modules/.pnpm/rolldown@1.0.0-rc.15/node_modules/rolldown/dist/parse-ast-index.mjs:25:9)
+    at wrap (file:///D:/ycz_me/backend/node_modules/.pnpm/rolldown@1.0.0-rc.15/node_modules/rolldown/dist/parse-ast-index.mjs:5:39)
+    at parseAstAsync (file:///D:/ycz_me/backend/node_modules/.pnpm/rolldown@1.0.0-rc.15/node_modules/rolldown/dist/parse-ast-index.mjs:54:9)
+    at V8CoverageProvider.remapCoverage (file:///D:/ycz_me/backend/node_modules/.pnpm/@vitest+coverage-v8@4.1.4_vitest@4.1.4/node_modules/@vitest/coverage-v8/dist/provider.js:133:10)
+    at file:///D:/ycz_me/backend/node_modules/.pnpm/@vitest+coverage-v8@4.1.4_vitest@4.1.4/node_modules/@vitest/coverage-v8/dist/provider.js:119:23
+    at async Promise.all (index 15)
+    at V8CoverageProvider.getCoverageMapForUncoveredFiles (file:///D:/ycz_me/backend/node_modules/.pnpm/@vitest+coverage-v8@4.1.4_vitest@4.1.4/node_modules/@vitest/coverage-v8/dist/provider.js:109:4)
+    at V8CoverageProvider.generateCoverage (file:///D:/ycz_me/backend/node_modules/.pnpm/@vitest+coverage-v8@4.1.4_vitest@4.1.4/node_modules/@vitest/coverage-v8/dist/provider.js:56:29)
+    at file:///D:/ycz_me/backend/node_modules/.pnpm/vitest@4.1.4_@types+node@25_731417b9eefa4eedeefb6541e5dd5c79/node_modules/vitest/dist/chunks/cli-api.lDy4N9kC.js:13580:23 {
+  code: 'PARSE_ERROR',
+  id: undefined,
+  pos: 12
+}
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/tests/unit/membership-pricing.test.ts[2m > [22mMembership 定价引擎测试 (TDD Step 3)[2m > [22m1. 折扣路径：VIP 会员输入 100 元应返回 85 元
+[31m[1mAssertionError[22m: expected 100 to be 85 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 85[39m
+[31m+ 100[39m
+
+[36m [2m❯[22m src/tests/unit/membership-pricing.test.ts:[2m38:24[22m[39m
+    [90m 36|[39m   [34mit[39m([32m'1. 折扣路径：VIP 会员输入 100 元应返回 85 元'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m 37|[39m     const finalPrice = await MembershipService.calculateMemberPrice(db…
+    [90m 38|[39m     [34mexpect[39m(finalPrice)[33m.[39m[34mtoBe[39m([34m85[39m)[33m;[39m
+    [90m   |[39m                        [31m^[39m
+    [90m 39|[39m   })[33m;[39m
+    [90m 40|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (3)[39m
+[2m   Start at [22m 13:28:21
+[2m   Duration [22m 2.55s[2m (transform 79ms, setup 101ms, import 503ms, tests 29ms, environment 733ms)[22m
+
+[34m % [39m[2mCoverage report from [22m[33mv8[39m
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |     0.1 |        0 |    0.52 |    0.11 |                   
+ src               |       0 |        0 |       0 |       0 |                   
+  app.ts           |       0 |        0 |       0 |       0 | 24-234            
+  env.d.ts         |       0 |        0 |       0 |       0 |                   
+ src/components    |       0 |        0 |       0 |       0 |                   
+  ...sionGuard.tsx |       0 |        0 |       0 |       0 | 15-27             
+  Sidebar.tsx      |       0 |        0 |       0 |       0 | 29-395            
+ ...mponents/admin |       0 |        0 |       0 |       0 |                   
+  ...SONEditor.tsx |       0 |        0 |       0 |       0 | 36-366            
+  AiSettings.tsx   |       0 |        0 |       0 |       0 | 47-511            
+  ...anagement.tsx |       0 |        0 |       0 |       0 | 57-631            
+  ...anagement.tsx |       0 |        0 |       0 |       0 | 51-1019           
+  ...anagement.tsx |       0 |        0 |       0 |       0 | 34-565            
+  EntryForm.tsx    |       0 |        0 |       0 |       0 | 27-1049           
+  ...lSettings.tsx |       0 |        0 |       0 |       0 | 11-219            
+  ...ectEditor.tsx |       0 |        0 |       0 |       0 | 27-260            
+  ...anagement.tsx |       0 |        0 |       0 |       0 | 35-301            
+  LeadsCenter.tsx  |       0 |        0 |       0 |       0 | 25-260            
+  MailSettings.tsx |       0 |        0 |       0 |       0 | 8-151             
+  ...anagement.tsx |       0 |        0 |       0 |       0 | 39-454            
+  MediaPicker.tsx  |       0 |        0 |       0 |       0 | 58-430            
+  ...anagement.tsx |       0 |        0 |       0 |       0 | 53-513            
+  ...ssionGrid.tsx |       0 |        0 |       0 |       0 | 25-107            
+  ...anagement.tsx |       0 |        0 |       0 |       0 | 44-280            
+  ...anagement.tsx |       0 |        0 |       0 |       0 | 48-346            
+  ...ateWizard.tsx |       0 |        0 |       0 |       0 | 46-308            
+  TiptapEditor.tsx |       0 |        0 |       0 |       0 | 46-406            
+ src/components/ai |       0 |        0 |       0 |       0 |                   
+  ...oatingBot.tsx |       0 |        0 |       0 |       0 | 9-91              
+  ChatWindow.tsx   |       0 |        0 |       0 |       0 | 14-151            
+ src/components/ui |       0 |        0 |       0 |       0 |                   
+  Badge.tsx        |       0 |      100 |       0 |       0 | 5-30              
+  Button.tsx       |       0 |        0 |       0 |       0 | 7-60              
+  Card.tsx         |       0 |      100 |       0 |       0 | 4-76              
+  Checkbox.tsx     |       0 |      100 |       0 |       0 | 6-40              
+  Dialog.tsx       |       0 |      100 |       0 |       0 | 6-103             
+  ...rBoundary.tsx |       0 |        0 |       0 |       0 | 18-68             
+  Input.tsx        |       0 |      100 |       0 |       0 | 7-22              
+  Label.tsx        |       0 |      100 |       0 |       0 | 7-22              
+  Select.tsx       |       0 |        0 |       0 |       0 | 9-68              
+  Sheet.tsx        |       0 |        0 |       0 |       0 | 7-121             
+  Skeleton.tsx     |       0 |      100 |       0 |       0 | 8                 
+  Switch.tsx       |       0 |      100 |       0 |       0 | 5-24              
+  Table.tsx        |       0 |      100 |       0 |       0 | 4-96              
+  Toast.tsx        |       0 |      100 |       0 |       0 | 7-110             
+  Toaster.tsx      |       0 |        0 |       0 |       0 | 21-155            
+ src/core          |       0 |        0 |       0 |       0 |                   
+  seed.ts          |       0 |        0 |       0 |       0 | 10-98             
+  system.ts        |       0 |        0 |       0 |       0 | 15-41             
+ src/lib           |       0 |        0 |       0 |       0 |                   
+  SeoUtils.ts      |       0 |        0 |       0 |       0 | 10-34             
+  auth.ts          |       0 |      100 |       0 |       0 | 10-59             
+  config.ts        |       0 |        0 |       0 |       0 | 7-54              
+  model-engine.ts  |       0 |        0 |       0 |       0 | 40-135            
+  ...n-registry.ts |       0 |        0 |       0 |       0 | 11-215            
+  rbac.test.ts     |       0 |      100 |       0 |       0 | 4-35              
+  rbac.ts          |       0 |        0 |       0 |       0 | 14-101            
+  ...ge-service.ts |       0 |        0 |       0 |       0 | 19-41             
+  tree-utils.ts    |       0 |        0 |       0 |       0 | 25-114            
+  utils.ts         |       0 |      100 |       0 |       0 | 5                 
+ src/middleware    |       0 |        0 |       0 |       0 |                   
+  dispatch.ts      |       0 |        0 |       0 |       0 | 18-107            
+  memberAuth.ts    |       0 |        0 |       0 |       0 | 7-53              
+  rbac.ts          |       0 |        0 |       0 |       0 | 9-58              
+ ...digital-worker |       0 |      100 |       0 |       0 |                   
+  index.ts         |       0 |      100 |       0 |       0 | 7-26              
+ src/routes        |       0 |        0 |       0 |       0 |                   
+  ai.ts            |       0 |        0 |       0 |       0 | 9-167             
+  api-v1.ts        |       0 |        0 |       0 |       0 | 5-50              
+  auth.ts          |       0 |        0 |       0 |       0 | 7-143             
+  crm.ts           |       0 |        0 |       0 |       0 | 6-64              
+  entities.ts      |       0 |        0 |       0 |       0 | 9-761             
+  infra.ts         |       0 |        0 |       0 |       0 | 4-80              
+  media.ts         |       0 |        0 |       0 |       0 | 8-200             
+  public-api.ts    |       0 |        0 |       0 |       0 | 14-496            
+  rbac-routes.ts   |       0 |        0 |       0 |       0 | 10-738            
+  settings.ts      |       0 |        0 |       0 |       0 | 7-222             
+  webhooks.ts      |       0 |      100 |       0 |       0 | 3-6               
+ src/routes/api/v1 |       0 |        0 |       0 |       0 |                   
+  plugins.ts       |       0 |        0 |       0 |       0 | 8-171             
+ src/scripts       |       0 |        0 |       0 |       0 |                   
+  ...up-orphans.ts |       0 |        0 |       0 |       0 | 9-36              
+ src/services      |    1.26 |        0 |     7.5 |    1.37 |                   
+  ...ingService.ts |       0 |        0 |       0 |       0 | 13-57             
+  ...areService.ts |       0 |        0 |       0 |       0 | 7-168             
+  ...wayManager.ts |       0 |        0 |       0 |       0 | 7-71              
+  ImageProxy.ts    |       0 |        0 |       0 |       0 | 16-70             
+  ...iryService.ts |       0 |        0 |       0 |       0 | 13-225            
+  ...uthService.ts |       0 |        0 |       0 |       0 | 19-96             
+  ...hipService.ts |   22.72 |        0 |     100 |   22.72 | 15-127,157        
+  NotifyService.ts |       0 |        0 |       0 |       0 | 6-148             
+  PluginService.ts |       0 |        0 |       0 |       0 | 16-116            
+  RbacService.ts   |       0 |        0 |       0 |       0 | 17-75             
+  SeoService.ts    |       0 |        0 |       0 |       0 | 12-73             
+  ...ateService.ts |       0 |        0 |       0 |       0 | 13-550            
+-------------------|---------|----------|---------|---------|-------------------
