@@ -31,7 +31,7 @@ let isSynced = false;
 async function performSystemSync(c: any, registry: PermissionRegistry) {
   const db = await createDbClient(c.env.DB);
   console.log(`📡 [System] 正在启动 Schema Radar (Environment: ${c.env.NODE_ENV || 'local'})...`);
-  
+
   // [Schema Migration Radar] 自动补全数据库缺失表与列 (必须在业务查询之前执行)
   if (c.env.NODE_ENV !== 'production') {
     try {
@@ -39,7 +39,7 @@ async function performSystemSync(c: any, registry: PermissionRegistry) {
       await db.run(sql`CREATE TABLE IF NOT EXISTS roles (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, scope TEXT DEFAULT 'tenant', description TEXT, created_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS permissions (slug TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, perm_category TEXT)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS role_permissions (role_id INTEGER NOT NULL, permission_slug TEXT NOT NULL, PRIMARY KEY(role_id, permission_slug))`);
-      
+
       // 核心模型架构
       await db.run(sql`CREATE TABLE IF NOT EXISTS models (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, fields_json TEXT NOT NULL, description TEXT, metadata TEXT, created_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS collections (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, model_id INTEGER NOT NULL, description TEXT, icon TEXT DEFAULT 'Layers', sort INTEGER DEFAULT 0, menu_group TEXT, menu_order INTEGER DEFAULT 0, parent_id INTEGER, relation_settings TEXT, field_config TEXT, permission_config TEXT, metadata TEXT, created_at INTEGER)`);
@@ -48,7 +48,7 @@ async function performSystemSync(c: any, registry: PermissionRegistry) {
       await db.run(sql`CREATE TABLE IF NOT EXISTS admins (id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, hashed_password TEXT NOT NULL, created_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS admin_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES admins(id), expires_at INTEGER NOT NULL)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS admins_to_roles (admin_id TEXT NOT NULL, role_id INTEGER NOT NULL, tenant_id INTEGER DEFAULT 0, PRIMARY KEY(admin_id, role_id, tenant_id))`);
-      
+
       await db.run(sql`CREATE TABLE IF NOT EXISTS members (id TEXT PRIMARY KEY, email TEXT NOT NULL, password_hash TEXT NOT NULL, tenant_id INTEGER NOT NULL, status TEXT DEFAULT 'active', created_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS member_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES members(id), expires_at INTEGER NOT NULL)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS languages (code TEXT PRIMARY KEY, name TEXT NOT NULL, status TEXT DEFAULT 'active', is_default INTEGER DEFAULT 0, created_at INTEGER)`);
@@ -71,7 +71,7 @@ async function performSystemSync(c: any, registry: PermissionRegistry) {
         `ALTER TABLE collections ADD COLUMN field_config TEXT`
       ];
       for (const cmd of alters) {
-        try { await db.run(sql.raw(cmd)); } catch(e) {}
+        try { await db.run(sql.raw(cmd)); } catch (e) { }
       }
     } catch (e) {
       console.error('❌ [System] Schema Radar 关键错误:', e);
@@ -91,7 +91,7 @@ async function performSystemSync(c: any, registry: PermissionRegistry) {
     try {
       const { PluginService } = await import('./services/PluginService');
       const { PLUGIN_CODE_REGISTRY } = await import('./lib/plugin-registry');
-      
+
       const enabledPlugins = await PluginService.getEnabledPlugins(db);
       for (const p of enabledPlugins) {
         const bundle = PLUGIN_CODE_REGISTRY[p.slug];
@@ -129,28 +129,28 @@ function createAdminApp() {
   // 2. 会话管理 (Session Hygiene)
   admin.use('/*', async (c, next) => {
     // 排除权限校验: 登录、公开入口、消费端 API
-    if (c.req.path.includes('/auth/admin/login') || 
-        c.req.path.includes('/auth/seed') ||
-        c.req.path.includes('/v1/p/') ||
-        c.req.path.includes('/v1/s/')
+    if (c.req.path.includes('/auth/admin/login') ||
+      c.req.path.includes('/auth/seed') ||
+      c.req.path.includes('/v1/p/') ||
+      c.req.path.includes('/v1/s/')
     ) return await next();
-    
+
     try {
       const { adminAuth } = await getAuthInstances(c.env.DB);
       const sessionId = adminAuth.readSessionCookie(c.req.header('Cookie') ?? '');
-      
+
       if (!sessionId) {
         c.set('user', null);
         c.set('session', null);
         return await next();
       }
-      
+
       const { session, user } = await adminAuth.validateSession(sessionId);
-      
+
       if (session && session.fresh) {
         c.header('Set-Cookie', adminAuth.createSessionCookie(session.id).serialize(), { append: true });
       }
-      
+
       if (!session) {
         // 会话失效，强制清理浏览器 Cookie
         c.header('Set-Cookie', adminAuth.createBlankSessionCookie().serialize(), { append: true });
@@ -188,8 +188,8 @@ function createAdminApp() {
   v1.route('/infra', infra);
   v1.route('/plugins', plugins);
   v1.all('/s/*', async (c) => {
-    // 延迟加载商城网关枢纽
-    const sf = (await import('./routes/storefront-api')).default;
+    // 延迟加载商城网关枢纽 (已重构为全动态 Hub)
+    const sf = (await import('./routes/front-api')).default;
     return sf.fetch(c.req.raw, c.env);
   });
   v1.route('/ai', ai);
@@ -202,7 +202,7 @@ function createAdminApp() {
 
   // 6. AI 公开网关 (Restore Middleware)
   admin.use('/v1/p/ai/*', publicAiGateway);
-  admin.route('/v1/p/ai', ai); 
+  admin.route('/v1/p/ai', ai);
   admin.route('/v1/p', publicApi);
 
   return admin;
@@ -223,13 +223,13 @@ export function createApplication(registry: PermissionRegistry = globalRegistry)
     try {
       const config = validateConfig(c.env);
       c.set('config' as any, config);
-      
+
       if (!isSynced && !syncPromise) {
         syncPromise = performSystemSync(c, registry).finally(() => {
           syncPromise = null;
         });
       }
-      
+
       await next();
     } catch (err: any) {
       console.error('❌ [System Init] Critical Error:', err);
