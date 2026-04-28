@@ -355,39 +355,41 @@ export const PluginManagement: React.FC = () => {
 
       {/* 登记插件 Modal */}
       <Dialog open={registerModalOpen} onOpenChange={setRegisterModalOpen}>
-        <DialogContent className="max-w-md bg-white rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+        <DialogContent className="max-w-xl bg-white rounded-2xl shadow-2xl overflow-hidden p-0">
+          <DialogHeader className="p-6 bg-slate-50/50 border-b border-slate-100">
+            <DialogTitle className="flex items-center gap-2 text-slate-800">
               <PlusCircle className="text-blue-600" size={18} />
               手动登记新资产
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-slate-500">
               请输入物理代码文件夹对应的 Slug 标识。系统将尝试从代码中提取 Manifest 信息。
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="slug" className="text-xs font-bold uppercase text-slate-500">Slug 标识 (必填)</Label>
-              <Input 
-                id="slug" 
-                placeholder="例如: membership" 
-                value={newPluginData.slug}
-                onChange={e => setNewPluginData(prev => ({ ...prev, slug: e.target.value }))}
-                className="font-mono"
-              />
-              <p className="text-[10px] text-slate-400">需与 src/plugins/ 下的目录名或注册表中的 Key 一致。</p>
+          <div className="p-6 space-y-5 max-h-[60vh] overflow-y-auto">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="slug" className="text-xs font-bold uppercase text-slate-500">Slug 标识 (必填)</Label>
+                <Input 
+                  id="slug" 
+                  placeholder="例如: membership" 
+                  value={newPluginData.slug}
+                  onChange={e => setNewPluginData(prev => ({ ...prev, slug: e.target.value }))}
+                  className="font-mono bg-slate-50 border-slate-200"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="name" className="text-xs font-bold uppercase text-slate-500">显示名称 (推荐)</Label>
+                <Input 
+                  id="name" 
+                  placeholder="会员管理系统" 
+                  value={newPluginData.name}
+                  onChange={e => setNewPluginData(prev => ({ ...prev, name: e.target.value }))}
+                />
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="name" className="text-xs font-bold uppercase text-slate-500">显示名称 (推荐)</Label>
-              <Input 
-                id="name" 
-                placeholder="会员管理系统" 
-                value={newPluginData.name}
-                onChange={e => setNewPluginData(prev => ({ ...prev, name: e.target.value }))}
-              />
-            </div>
-            <div className="grid gap-2">
+
+            <div className="space-y-1.5">
               <Label htmlFor="desc" className="text-xs font-bold uppercase text-slate-500">功能简述</Label>
               <Input 
                 id="desc" 
@@ -396,16 +398,30 @@ export const PluginManagement: React.FC = () => {
                 onChange={e => setNewPluginData(prev => ({ ...prev, description: e.target.value }))}
               />
             </div>
+
+            <div className="space-y-2 border-t border-slate-100 pt-4">
+              <Label className="text-xs font-bold uppercase text-slate-500 flex items-center gap-2">
+                <Settings size={14} className="text-blue-500" />
+                高级初始化配置 (JSON)
+              </Label>
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <AdvancedJSONEditor 
+                  value={newPluginData.config || {}} 
+                  onChange={(val) => setNewPluginData(prev => ({ ...prev, config: val }))} 
+                />
+              </div>
+              <p className="text-[10px] text-slate-400">登记成功后，这些参数将作为插件的初始运行时配置应用。</p>
+            </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setRegisterModalOpen(false)}>取消</Button>
+          <DialogFooter className="bg-slate-50 p-4 border-t border-slate-100 mt-0">
+            <Button variant="ghost" onClick={() => setRegisterModalOpen(false)}>取消操作</Button>
             <Button 
                 onClick={handleRegister} 
                 disabled={processingSlug === 'registering'}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px]"
             >
-              {processingSlug === 'registering' ? '正在认证代码...' : '立即登记资产'}
+              {processingSlug === 'registering' ? '正在连接资产...' : '立即激活资产'}
             </Button>
           </DialogFooter>
         </DialogContent>

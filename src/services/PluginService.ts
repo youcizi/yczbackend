@@ -96,12 +96,15 @@ export class PluginService {
 
     if (enabled) {
       const bundle = PLUGIN_CODE_REGISTRY[slug];
-      if (bundle && bundle.manifest.permissions) {
-        // 动态注入到内存注册表
-        const { registry } = await import('../lib/permission-registry');
-        registry.registerPluginPermissions({ slug, name: bundle.manifest.name }, bundle.manifest.permissions);
-        // 执行同步到 DB
-        await registry.syncToDb(db, true);
+      if (bundle) {
+        const manifest = await bundle.getManifest();
+        if (manifest && manifest.permissions) {
+          // 动态注入到内存注册表
+          const { registry } = await import('../lib/permission-registry');
+          registry.registerPluginPermissions({ slug, name: manifest.name }, manifest.permissions);
+          // 执行同步到 DB
+          await registry.syncToDb(db, true);
+        }
       }
     }
 
@@ -118,11 +121,14 @@ export class PluginService {
 
     for (const p of enabledPlugins) {
       const bundle = PLUGIN_CODE_REGISTRY[p.slug];
-      if (bundle && bundle.manifest.adminMenu) {
-        menus.push({
-          ...bundle.manifest.adminMenu,
-          slug: p.slug
-        });
+      if (bundle) {
+        const manifest = await bundle.getManifest();
+        if (manifest && manifest.adminMenu) {
+          menus.push({
+            ...manifest.adminMenu,
+            slug: p.slug
+          });
+        }
       }
     }
 
@@ -132,14 +138,17 @@ export class PluginService {
   /**
    * 手动登记新插件 (供管理后台使用)
    */
-  static async registerPluginManually(db: any, data: { slug: string; name: string; description: string }) {
+  static async registerPluginManually(db: any, data: { slug: string; name: string; description: string; config?: any }) {
     // 1. 验证代码是否存在于注册表
     const bundle = PLUGIN_CODE_REGISTRY[data.slug];
     if (!bundle) {
       throw new Error(`[代码认证失败] 在 src/plugins/ 未找到 slug 为 "${data.slug}" 的插件代码。请先在代码层面完成导入。`);
     }
 
-    const manifest = bundle.manifest;
+    const manifest = await bundle.getManifest();
+    if (!manifest) {
+      throw new Error(`[元数据获取失败] 插件 ${data.slug} 的定义文件缺失或已损坏。`);
+    }
 
     // 2. 插入元数据
     const result = await this.registerPlugin(db, {
@@ -148,7 +157,8 @@ export class PluginService {
       description: data.description || manifest.description,
       version: manifest.version,
       author: manifest.author,
-      isEnabled: false // 初始默认为停用，需手动激活
+      isEnabled: false, // 初始默认为停用，需手动激活
+      config: data.config
     });
 
     return result;
@@ -164,6 +174,7 @@ export class PluginService {
     version: string; 
     author: string;
     isEnabled?: boolean;
+    config?: any;
   }) {
     // Upsert 逻辑
     const existing = await db.select().from(plugins).where(eq(plugins.slug, data.slug)).get();
@@ -176,6 +187,7 @@ export class PluginService {
           version: data.version,
           author: data.author,
           isEnabled: data.isEnabled ?? existing.isEnabled,
+          config: data.config ?? existing.config,
           updatedAt: new Date(),
         })
         .where(eq(plugins.slug, data.slug))
@@ -188,6 +200,7 @@ export class PluginService {
         version: data.version,
         author: data.author,
         isEnabled: data.isEnabled ?? true,
+        config: data.config || {},
         configSchema: {}
       }).run();
     }

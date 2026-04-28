@@ -6,12 +6,7 @@ import { requirePermission } from '../../../middleware/rbac';
 import { adminsToRoles, roles } from '../../../db/schema';
 import { PLUGIN_CODE_REGISTRY } from '../../../lib/plugin-registry';
 
-// 自动根据注册表构建本地分发映射 (单 Worker 模式)
-const LOCAL_DISPATCH_REGISTRY: Record<string, any> = {};
-Object.entries(PLUGIN_CODE_REGISTRY).forEach(([slug, bundle]) => {
-  if (bundle.backend) LOCAL_DISPATCH_REGISTRY[slug] = bundle.backend;
-});
-
+// 自动分发映射现在改为动态解析，不再在此处建立静态缓存
 const plugins = new Hono<{ Bindings: any }>();
 const admin = new Hono<{ Bindings: any }>();
 
@@ -27,20 +22,22 @@ admin.get('/available', async (c) => {
   const installed = await PluginService.getAllPlugins(db);
   
   // 结合代码注册表，补充元数据 (版本、作者等)
-  const result = installed.map(p => {
+  const result = await Promise.all(installed.map(async (p) => {
     const bundle = PLUGIN_CODE_REGISTRY[p.slug];
+    const manifest = bundle ? await bundle.getManifest() : null;
+    
     return {
       slug: p.slug,
       name: p.name,
       description: p.description,
-      version: bundle?.manifest.version || 'v1.0.0',
-      author: bundle?.manifest.author || 'Unknown',
+      version: manifest?.version || 'v1.0.0',
+      author: manifest?.author || 'Unknown',
       isInstalled: true,
       isEnabled: !!p.isEnabled,
       dbId: p.id,
       isCodePresent: !!bundle
     };
-  });
+  }));
 
   return c.json({ success: true, data: result });
 });
@@ -174,10 +171,12 @@ plugins.all('/proxy/:slug/*', async (c) => {
   const proxyStartIndex = pathParts.indexOf('proxy');
   const remainingPath = '/' + pathParts.slice(proxyStartIndex + 2).join('/');
 
-  // 2. 尝试本地降级分发 (单 Worker 逻辑)
-  const localApp = LOCAL_DISPATCH_REGISTRY[slug];
+  // 2. 尝试本地动态分发 (单 Worker 逻辑)
+  const bundle = PLUGIN_CODE_REGISTRY[slug];
+  const localApp = bundle ? await bundle.getAdminApp() : null;
+
   if (localApp) {
-    console.log(`🏠 [Local Dispatch] RPC -> ${slug}: ${c.req.method} ${remainingPath}`);
+    console.log(`🏠 [Local Dynamic Dispatch] RPC -> ${slug}: ${c.req.method} ${remainingPath}`);
     
     let body: any = null;
     if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {

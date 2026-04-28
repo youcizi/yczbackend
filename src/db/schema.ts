@@ -3,7 +3,11 @@ import { members } from './schema/members';
 import { inquiries } from './schema/inquiries';
 export * from './schema/members';
 export * from './schema/inquiries';
-export * from './schema/membership';
+
+// ============================================================================
+// [PLUGIN SCHEMAS] - 插件专属 Schema 挂载点 (由脚本自动生成，请勿手动修改)
+// ============================================================================
+export * from './auto-schema.gen';
 
 /**
  * 站点配置表

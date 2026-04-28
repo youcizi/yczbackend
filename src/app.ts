@@ -95,8 +95,11 @@ async function performSystemSync(c: any, registry: PermissionRegistry) {
       const enabledPlugins = await PluginService.getEnabledPlugins(db);
       for (const p of enabledPlugins) {
         const bundle = PLUGIN_CODE_REGISTRY[p.slug];
-        if (bundle && bundle.manifest.permissions) {
-          registry.registerPluginPermissions(p, bundle.manifest.permissions);
+        if (bundle) {
+          const manifest = await bundle.getManifest();
+          if (manifest && manifest.permissions) {
+            registry.registerPluginPermissions(p, manifest.permissions);
+          }
         }
       }
     } catch (pluginError) {
@@ -125,8 +128,12 @@ function createAdminApp() {
 
   // 2. 会话管理 (Session Hygiene)
   admin.use('/*', async (c, next) => {
-    // 排除特定路由
-    if (c.req.path.includes('/auth/admin/login') || c.req.path.includes('/auth/seed')) return await next();
+    // 排除权限校验: 登录、公开入口、消费端 API
+    if (c.req.path.includes('/auth/admin/login') || 
+        c.req.path.includes('/auth/seed') ||
+        c.req.path.includes('/v1/p/') ||
+        c.req.path.includes('/v1/s/')
+    ) return await next();
     
     try {
       const { adminAuth } = await getAuthInstances(c.env.DB);
@@ -180,6 +187,11 @@ function createAdminApp() {
   v1.route('/settings', settings);
   v1.route('/infra', infra);
   v1.route('/plugins', plugins);
+  v1.all('/s/*', async (c) => {
+    // 延迟加载商城网关枢纽
+    const sf = (await import('./routes/storefront-api')).default;
+    return sf.fetch(c.req.raw, c.env);
+  });
   v1.route('/ai', ai);
   v1.route('/', apiV1);
 

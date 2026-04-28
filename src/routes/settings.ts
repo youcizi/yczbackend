@@ -1,10 +1,20 @@
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { createDbClient } from '../db';
-import { systemSettings } from '../db/schema';
+import { systemSettings, languages } from '../db/schema';
 import { requirePermission } from '../lib/rbac';
 
 const settingsRoutes = new Hono<{ Bindings: any }>();
+
+/**
+ * GET /api/v1/settings/languages
+ * 获取系统支持的语种列表 (用于 I18n 表单动态渲染)
+ */
+settingsRoutes.get('/languages', async (c) => {
+  const db = await createDbClient(c.env.DB);
+  const list = await db.select().from(languages).all();
+  return c.json({ success: true, data: list });
+});
 
 // GET /api/v1/settings/mail_config
 settingsRoutes.get('/mail_config', requirePermission(['settings.mail', 'role.manage']), async (c) => {
