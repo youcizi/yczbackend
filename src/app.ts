@@ -19,6 +19,7 @@ import { PermissionRegistry, registry as globalRegistry } from './lib/permission
 import { requirePermission } from './middleware/rbac';
 import { domainDispatcher } from './middleware/dispatch';
 import { ImageProxy } from './services/ImageProxy';
+import { IdentityService } from './services/IdentityService';
 
 // 权限自动同步进度锁 (利用 Worker 内存或 Promise 状态，防止并发冲突)
 let syncPromise: Promise<void> | null = null;
@@ -49,16 +50,20 @@ async function performSystemSync(c: any, registry: PermissionRegistry) {
       await db.run(sql`CREATE TABLE IF NOT EXISTS admin_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES admins(id), expires_at INTEGER NOT NULL)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS admins_to_roles (admin_id TEXT NOT NULL, role_id INTEGER NOT NULL, tenant_id INTEGER DEFAULT 0, PRIMARY KEY(admin_id, role_id, tenant_id))`);
 
-      await db.run(sql`CREATE TABLE IF NOT EXISTS members (id TEXT PRIMARY KEY, email TEXT NOT NULL, password_hash TEXT NOT NULL, tenant_id INTEGER NOT NULL, status TEXT DEFAULT 'active', created_at INTEGER)`);
-      await db.run(sql`CREATE TABLE IF NOT EXISTS member_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES members(id), expires_at INTEGER NOT NULL)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, tenant_id INTEGER NOT NULL, email TEXT NOT NULL, password_hash TEXT NOT NULL, user_type TEXT NOT NULL, status TEXT DEFAULT 'active', created_at INTEGER, updated_at INTEGER, UNIQUE(tenant_id, email))`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS members (id TEXT PRIMARY KEY, type TEXT DEFAULT 'registered', level INTEGER DEFAULT 1)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS admins (id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS languages (code TEXT PRIMARY KEY, name TEXT NOT NULL, status TEXT DEFAULT 'active', is_default INTEGER DEFAULT 0, created_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS plugins (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT UNIQUE NOT NULL, name TEXT NOT NULL, config TEXT, config_schema TEXT, is_enabled INTEGER DEFAULT 0, created_at INTEGER, updated_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS media_items (id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT NOT NULL, filename TEXT NOT NULL, mime_type TEXT NOT NULL, size INTEGER NOT NULL, is_remote INTEGER DEFAULT 0, created_by TEXT, metadata TEXT, created_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, description TEXT, updated_at INTEGER)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS p_member_profiles (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, member_id TEXT NOT NULL, name TEXT, avatar TEXT, phone TEXT, account_type TEXT DEFAULT 'individual', tier_id INTEGER DEFAULT 1, metadata TEXT, created_at INTEGER)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS p_member_tiers (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, name TEXT NOT NULL, discount_rate INTEGER DEFAULT 100, created_at INTEGER)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS p_member_tiers_i18n (id INTEGER PRIMARY KEY AUTOINCREMENT, tier_id INTEGER NOT NULL, lang_code TEXT NOT NULL, name TEXT NOT NULL, UNIQUE(tier_id, lang_code))`);
 
       // 核心业务：询盘
       await db.run(sql`CREATE TABLE IF NOT EXISTS inquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, member_id TEXT, email TEXT NOT NULL, content TEXT NOT NULL, verify_token TEXT, status TEXT DEFAULT 'pending', source_url TEXT, metadata TEXT, created_at INTEGER, updated_at INTEGER)`);
-      console.log('✨ [System] Schema Radar: 核心系统表验证完成');
+      console.log('✨ [System] Schema Radar: 核心系统与会员插件表验证完成');
 
       // 增量字段补全 (自愈)
       const alters = [
@@ -171,6 +176,69 @@ function createAdminApp() {
     try {
       await seedAdmin(c.env.DB, c.env.DEFAULT_ADMIN_PASSWORD);
       return c.json({ message: 'Seed Success' });
+    } catch (err: any) {
+      return c.json({ error: err.message }, 500);
+    }
+  });
+
+  // 种子数据：填充初始测试用户 (仅开发环境)
+  auth.get('/seed-users', async (c) => {
+    if (process.env.NODE_ENV === 'production') {
+      return c.json({ error: 'Only allowed in development' }, 403);
+    }
+    try {
+      const dbModule = await import('./db');
+      const db = await dbModule.createDbClient(c.env.DB);
+      const schema = dbModule.schema;
+      const { generateId } = await import('lucia');
+      const { passwordHasher } = await import('./lib/auth');
+      const passwordHash = await passwordHasher.hash('password123');
+      const results = [];
+      
+      // 1. 种子管理员
+      const adminId = generateId(15);
+      await db.insert(schema.users).values({
+        id: adminId,
+        tenantId: 1,
+        email: 'admin@system.com',
+        passwordHash,
+        userType: 'admin',
+        status: 'active'
+      }).onConflictDoNothing().run();
+
+      await db.insert(schema.admins).values({
+        id: adminId,
+        username: '超级管理员'
+      }).onConflictDoNothing().run();
+      
+      results.push({ email: 'admin@system.com', type: 'admin' });
+
+      // 2. 种子普通用户 (Member 身份)
+      for (let i = 1; i <= 5; i++) {
+        const email = `user${i}@example.com`;
+        const userId = generateId(15);
+        try {
+          await db.insert(schema.users).values({
+            id: userId,
+            tenantId: 1,
+            email,
+            passwordHash,
+            userType: 'member',
+            status: 'active'
+          }).onConflictDoNothing().run();
+
+          await db.insert(schema.members).values({
+            id: userId,
+            type: 'registered',
+            level: i
+          }).onConflictDoNothing().run();
+
+          results.push({ email, type: 'member', id: userId });
+        } catch (e: any) {
+          results.push({ email, status: 'failed', reason: e.message });
+        }
+      }
+      return c.json({ message: 'Seed Users Complete', results });
     } catch (err: any) {
       return c.json({ error: err.message }, 500);
     }

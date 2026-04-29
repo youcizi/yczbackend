@@ -8,7 +8,11 @@ import { createDbClient } from '../../db';
  */
 const sfApp = new Hono<{ Bindings: any }>();
 
+import sfApi from './api-front';
+
 // 身份共享：直接使用网关解析出的 current_member 上下文
+sfApp.route('/', sfApi); // 挂载注册等前台接口
+
 sfApp.get('/my-tier', async (c) => {
   const db = await createDbClient(c.env.DB);
   const member = c.get('current_member' as any);

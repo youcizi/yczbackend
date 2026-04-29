@@ -24,9 +24,10 @@ if (!user) {
   return Astro.redirect('/login');
 }
 
-// 直接从 locals 获取经过中间件处理的环境变量
-const runtime = (Astro.locals as any).runtime || {};
-const DB = runtime.DB || (Astro.locals as any).DB;
+import { env } from 'cloudflare:workers';
+
+// 直接从 runtime 获取环境变量 (Astro v6 / Cloudflare Native)
+const DB = env.DB;
 const db = await createDbClient(DB);
 const permissions = await getAdminPermissions(db, user.id);
 

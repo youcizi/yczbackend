@@ -5,6 +5,7 @@ import { PluginService } from '../../../services/PluginService';
 import { requirePermission } from '../../../middleware/rbac';
 import { adminsToRoles, roles } from '../../../db/schema';
 import { PLUGIN_CODE_REGISTRY } from '../../../lib/plugin-registry';
+import { PLUGIN_MIDDLEWARES } from '../../../lib/auto-middleware.gen';
 
 // 自动分发映射现在改为动态解析，不再在此处建立静态缓存
 const plugins = new Hono<{ Bindings: any }>();
@@ -158,7 +159,18 @@ admin.patch('/config', async (c) => {
  * [PUBLIC] 插件路由万能代理 (RPC Proxy)
  * ALL /proxy/:slug/* -> 转发给插件 Hono 应用
  */
-plugins.all('/proxy/:slug/*', async (c) => {
+plugins.all('/proxy/:slug/*', async (c, next) => {
+  const slug = c.req.param('slug');
+  const getMiddleware = PLUGIN_MIDDLEWARES[slug];
+  if (getMiddleware) {
+    const mw = await getMiddleware();
+    if (mw) {
+      console.log(`🛡️ [Plugin Middleware] Running for ${slug}`);
+      return mw(c, next);
+    }
+  }
+  await next();
+}, async (c) => {
   const slug = c.req.param('slug');
   const db = await createDbClient(c.env.DB);
 

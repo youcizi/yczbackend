@@ -1,0 +1,81 @@
+---
+import { env } from 'cloudflare:workers';
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+import { SystemConfigProvider } from '../../contexts/SystemConfigContext';
+import { PluginService } from '../../services/PluginService';
+import { AdminList } from '../../components/admin/AdminList';
+import { createDbClient, schema, eq } from '../../db';
+
+/**
+ * 管理员列表页面 (Core Identity Layer)
+ * 职责：负责服务器端数据拉取与权限初步校验
+ */
+
+// 1. 获取数据库客户端
+const db = await createDbClient(env.DB);
+
+// 2. 拉取已启用的插件列表 (用于前端门控)
+const enabledPlugins = await PluginService.getEnabledPlugins(db);
+const activeSlugs = enabledPlugins.map(p => p.slug);
+
+// 3. 拉取系统全量用户数据 (核心身份层：Admin + Member)
+const userData = await db.select({
+  id: schema.users.id,
+  email: schema.users.email,
+  userType: schema.users.userType,
+  status: schema.users.status,
+  createdAt: schema.users.createdAt,
+  // 核心字段：如果是管理员，关联获取其用户名
+  username: schema.admins.username,
+})
+.from(schema.users)
+.leftJoin(schema.admins, eq(schema.users.id, schema.admins.id))
+.all();
+---
+
+<DashboardLayout title="用户管理">
+  <div class="admin-page-container p-4 md:p-8 max-w-7xl mx-auto">
+    <!-- 头部区域 -->
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+      <div>
+        <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">用户管理基座</h1>
+        <p class="text-slate-500 mt-2 flex items-center gap-2">
+          <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+          系统级核心身份模块 · 管理系统用户账号
+        </p>
+      </div>
+      
+      <div class="flex gap-3">
+        <a href="/api/auth/seed-users" class="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
+          重置用户数据
+        </a>
+      </div>
+    </header>
+
+    <!-- 统计卡片 -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div class="p-6 bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">总计用户</div>
+        <div class="text-2xl font-black text-slate-900">{userData.length}</div>
+      </div>
+      <div class="p-6 bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">管理员</div>
+        <div class="text-2xl font-black text-blue-600">{userData.filter(u => u.userType === 'admin').length}</div>
+      </div>
+      <div class="p-6 bg-white rounded-xl border border-slate-100 shadow-sm">
+        <div class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">普通用户</div>
+        <div class="text-2xl font-black text-amber-600">{userData.filter(u => u.userType === 'member').length}</div>
+      </div>
+    </section>
+
+    <!-- 列表组件 -->
+    <main>
+      <AdminList users={userData} activePlugins={activeSlugs} client:load />
+    </main>
+
+    <!-- 底部说明 -->
+    <footer class="mt-12 text-center text-xs text-slate-400">
+      <p>© 2026 Core Identity Layer · 核心认证系统</p>
+    </footer>
+  </div>
+</DashboardLayout>

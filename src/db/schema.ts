@@ -1,6 +1,6 @@
-import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
-import { members } from './schema/members';
-import { inquiries } from './schema/inquiries';
+import { sqliteTable, text, integer, uniqueIndex, primaryKey } from 'drizzle-orm/sqlite-core';
+import { users } from './schema/users';
+export * from './schema/users';
 export * from './schema/members';
 export * from './schema/inquiries';
 
@@ -92,13 +92,11 @@ export const adminSiteAccess = sqliteTable('admin_site_access', {
 }));
 
 /**
- * 管理员表 (重构：移除直接 Role 字段)
+ * 管理员业务表 (Extended Profile)
  */
 export const admins = sqliteTable('admins', {
-  id: text('id').primaryKey(),
+  id: text('id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   username: text('username').unique().notNull(),
-  hashedPassword: text('hashed_password').notNull(),
-  // 角色改为多对多关联，此处不再存储 role 字符串
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 

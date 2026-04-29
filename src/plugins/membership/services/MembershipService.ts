@@ -12,7 +12,7 @@ export class MembershipService {
    * 插件初始化：注册系统钩子
    */
   static initPlugin() {
-    // 订阅定价计算钩子 (对齐 V2.0 命名)
+    // 1. 订阅定价计算钩子
     hookManager.on('order:pricing', async (ctx, data) => {
       const { db, tenantId, member } = ctx;
       if (!member?.id) return data;
@@ -29,7 +29,22 @@ export class MembershipService {
       }
       return data;
     });
-    console.log('✅ [Membership] Hook "order:pricing" 已就绪');
+
+    // 2. 订阅身份注册钩子：自动初始化会员档案
+    hookManager.on('identity:registered', async (ctx, { user }) => {
+      const { db } = ctx;
+      if (user.userType === 'member') {
+        await db.insert(pMemberProfiles).values({
+          tenantId: user.tenantId,
+          memberId: user.id,
+          name: user.email.split('@')[0],
+          tierId: 1, // 默认初始等级
+        }).run();
+        console.log(`✨ [Membership] 已为新会员 ${user.id} 自动创建档案`);
+      }
+    });
+
+    console.log('✅ [Membership] 业务钩子已就绪');
   }
 
   /**

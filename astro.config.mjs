@@ -5,7 +5,7 @@ import cloudflare from '@astrojs/cloudflare';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import { vitePluginWeaver } from './src/lib/vite-plugin-weaver';
 
 // https://astro.build/config
 export default defineConfig({
@@ -18,14 +18,16 @@ export default defineConfig({
     },
   }),
   vite: {
+    optimizeDeps: {
+      exclude: ['@astrojs/cloudflare']
+    },
     plugins: [
+      vitePluginWeaver(),
       {
         name: 'ignore-native-modules',
-        enforce: 'pre', // 确保在其他插件之前运行
+        enforce: 'pre',
         resolveId(id) {
-          // 仅在生产环境构建时拦截
           if (process.env.NODE_ENV !== 'production') return null;
-
           const targets = [
             'better-sqlite3',
             'drizzle-orm/better-sqlite3',
@@ -59,8 +61,6 @@ export default defineConfig({
       }
     ],
     ssr: {
-      // 生产环境将 Node 内置模块外置，利用 Cloudflare nodejs_compat
-      // 包含带 node: 前缀和不带前缀的版本，确保 esbuild 不会尝试打包它们
       external: process.env.NODE_ENV === 'production' ? [
         'node:events', 'events',
         'node:fs', 'fs',

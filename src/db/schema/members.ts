@@ -1,26 +1,15 @@
 import { sqliteTable, text, integer, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { users } from './users';
 
 /**
- * 多租户会员表 (Identity System)
+ * 多租户会员业务表 (Extended Profile)
  */
 export const members = sqliteTable('members', {
-  // 会员唯一 ID (建议使用 nanoid 或 UUID)
-  id: text('id').primaryKey(),
-  
-  // 租户隔离标识 (对应 sites.id)
-  tenantId: integer('tenant_id').notNull(),
-  
-  // 会员账号
-  email: text('email').notNull(),
-  
-  // 认证信息
-  passwordHash: text('password_hash').notNull(),
+  // 关联核心用户 ID
+  id: text('id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   
   // 会员类型: registered (已注册) | guest (访客)
   type: text('type', { enum: ['registered', 'guest'] }).default('registered'),
-  
-  // 账号状态
-  status: text('status', { enum: ['active', 'banned'] }).default('active'),
   
   // 会员等级 (预留)
   level: integer('level').default(1),
@@ -30,7 +19,4 @@ export const members = sqliteTable('members', {
   
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$onUpdate(() => new Date()),
-}, (t) => ({
-  // 核心约束：同一个租户下 email 必须唯一
-  memberUniqueIdx: uniqueIndex('member_unique_idx').on(t.tenantId, t.email),
-}));
+});

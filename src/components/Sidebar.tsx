@@ -58,7 +58,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
 
   // 客户端数据刷新逻辑
   const refreshCollections = useCallback(async () => {
-    // ... 原有逻辑保持不变 ...
     try {
       const res = await fetch('/api/v1/rbac/collections');
       if (res.ok) {
@@ -82,7 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
           title: p.title,
           href: p.path,
           icon: getIcon(p.icon),
-          requiredPermission: 'plugins.manage' // 每个插件项也需权限校验
+          requiredPermission: 'plugins.manage'
         }));
         setPluginItems(formattedItems);
       }
@@ -149,6 +148,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
     { title: '概览', href: '/admin', icon: LayoutDashboard, requiredPermission: 'site.view' },
     // NOTE: 线索中心使用独立的 leads.view 权限，而非通用的 site.view
     { title: '线索中心', href: '/admin/leads', icon: Users, requiredPermission: 'leads.view' },
+    { title: '用户管理', href: '/admin/users', icon: UserCircle2, requiredPermission: 'site.view' },
     ...dynamicGroups,
     {
       title: '模型管理',
@@ -171,19 +171,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
     },
     {
       title: '系统管理',
-      // NOTE: 系统管理组的显示取决于子项中最宽泛的权限之一，这里用 media.manage 作为入口守卫
       icon: Settings,
       requiredPermission: 'media.manage',
       subItems: [
         { title: '附件管理', href: '/admin/media', icon: Package, requiredPermission: 'media.manage' },
-        // NOTE: 常规设置和邮件服务使用独立的细粒度权限
         { title: '常规设置', href: '/admin/settings/general', icon: Settings, requiredPermission: ['settings.general', 'role.manage'] },
         { title: '语言设置', href: '/admin/languages', icon: Languages, requiredPermission: ['languages.manage', 'role.manage'] },
         { title: '邮件服务', href: '/admin/settings/mail', icon: Mail, requiredPermission: ['settings.mail', 'role.manage'] },
         { title: 'AI 网关', href: '/admin/settings/ai', icon: Wand2, requiredPermission: ['settings.ai', 'role.manage'] },
       ]
     },
-    // 动态插件组
     ...(pluginItems.length > 0 ? [{
       title: '扩展功能',
       icon: LucideIcons.Plug,
@@ -192,9 +189,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
     }] : []),
   ];
 
-  // 2. 再根据字典计算自动展开状态
   const autoExpanded = React.useMemo(() => {
-    const expanded = ['内容管理']; // 核心目录默认展开
+    const expanded = ['内容管理']; 
     MENU_ITEMS.forEach(menu => {
       const hasActiveSub = menu.subItems?.some(sub => currentPath === sub.href);
       if (hasActiveSub && !expanded.includes(menu.title)) {
@@ -212,8 +208,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
     );
   };
 
-  // 实时响应路径变化
-  React.useEffect(() => {
+  useEffect(() => {
     setExpandedMenus(prev => {
       const next = [...prev];
       autoExpanded.forEach(title => {
@@ -223,18 +218,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
     });
   }, [autoExpanded]);
 
-  // 当外部 Props 变化时同步（如 SSR 场景或单元测试 Rerender）
   useEffect(() => {
     setDynamicCollections(collections);
   }, [collections]);
 
-  // 监听全局集合更新事件 (实现 React Island 间的实时同步)
   useEffect(() => {
     const handleUpdate = () => {
-      console.log('📡 [Sidebar] Received collections-updated event, refreshing...');
       refreshCollections();
     };
-
     window.addEventListener('collections-updated', handleUpdate);
     return () => window.removeEventListener('collections-updated', handleUpdate);
   }, [refreshCollections]);
@@ -244,7 +235,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
   return (
     <ErrorBoundary fallback={<div className="p-4 text-xs text-red-500 bg-red-950/20 rounded m-4 border border-red-900/50">侧边栏组件渲染异常，请尝试刷新页面或联系技术支持。</div>}>
       <div className="w-64 h-full bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800">
-        {/* ... Logo Section unchanged ... */}
         <div className="p-6 border-b border-slate-800">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
@@ -263,8 +253,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
             onToggle={handleSidebarMenuToggle}
           />
         </nav>
-        {/* ... Footer Section unchanged ... */}
-        {/* NOTE: 初始化站点是高风险操作，使用独立的 site.init 权限控制显隐 */}
+
         {hasPermission(permissions, 'site.init') && (
           <div className="px-4 mb-4">
             <button
@@ -300,9 +289,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
   );
 };
 
-/**
- * 递归菜单组件
- */
 const RecursiveMenu: React.FC<{
   items: any[];
   permissions: string[];
@@ -311,7 +297,6 @@ const RecursiveMenu: React.FC<{
   onToggle: (title: string) => void;
   level?: number;
 }> = ({ items, permissions, currentPath, expandedMenus, onToggle, level = 0 }) => {
-  // 辅助函数：判断是否有任何后代项处于激活状态
   const hasActiveChild = (item: any): boolean => {
     if (item.href && currentPath === item.href) return true;
     if (item.subItems) {
@@ -336,12 +321,11 @@ const RecursiveMenu: React.FC<{
               <button
                 type="button"
                 onClick={() => onToggle(item.title)}
-                data-testid={`nav-parent-${item.title}`}
                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg transition-all duration-200 group ${
                   isParentActive ? 'bg-slate-800/50 text-white' : 'hover:bg-slate-800 hover:text-white'
                 } ${level > 0 ? 'ml-2 pr-2' : ''}`}
               >
-                <div className="flex items-center gap-3 pointer-events-none">
+                <div className="flex items-center gap-3">
                   {level === 0 ? (
                     <item.icon size={18} className={isParentActive ? 'text-blue-400' : 'text-slate-400 group-hover:text-blue-400'} />
                   ) : (
@@ -351,13 +335,12 @@ const RecursiveMenu: React.FC<{
                 </div>
                 <ChevronRight
                   size={14}
-                  className={`transition-transform duration-200 pointer-events-none ${isExpanded ? 'rotate-90 text-blue-400' : 'text-slate-500'}`}
+                  className={`transition-transform duration-200 ${isExpanded ? 'rotate-90 text-blue-400' : 'text-slate-50'}`}
                 />
               </button>
             ) : (
               <a
                 href={item.href}
-                data-testid={level === 0 ? `nav-root-${item.title}` : `nav-sub-${item.title}`}
                 className={`flex items-center justify-between px-4 py-2.5 rounded-lg transition-all duration-200 group ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
@@ -372,12 +355,11 @@ const RecursiveMenu: React.FC<{
                   )}
                   <span className={`${level === 0 ? 'font-medium' : 'text-xs'} truncate`}>{item.title}</span>
                 </div>
-                {isActive && level === 0 && <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />}
               </a>
             )}
 
             {hasSubItems && isExpanded && (
-              <div className={`border-l border-slate-800 space-y-1 mt-1 animate-in slide-in-from-left-2 duration-200 ${level === 0 ? 'ml-4 pl-0' : 'ml-4'}`}>
+              <div className={`border-l border-slate-800 space-y-1 mt-1 ${level === 0 ? 'ml-4' : 'ml-4'}`}>
                 <RecursiveMenu 
                   items={item.subItems} 
                   permissions={permissions} 
@@ -395,7 +377,6 @@ const RecursiveMenu: React.FC<{
   );
 };
 
-// 极简错误边界组件
 class ErrorBoundary extends React.Component<{ children: React.ReactNode, fallback: React.ReactNode }, { hasError: boolean }> {
   constructor(props: any) {
     super(props);
