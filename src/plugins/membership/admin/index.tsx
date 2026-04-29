@@ -10,12 +10,17 @@ import { RefreshCcw, Plus, Trash2, Languages, Save } from 'lucide-react';
 import { useToast } from '../../../components/ui/Toaster';
 
 /**
- * MembershipManagement: 会员插件管理 UI 容器 (Step 8 - 多语言增强版)
+ * MembershipManagement: 会员插件管理 UI 容器 (V2.0 自动发现版)
  */
 export const MembershipManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [tiers, setTiers] = useState<any[]>([]);
   const [langs, setLangs] = useState<any[]>([]);
+  const [editingTier, setEditingTier] = useState<any>({
+    name: '',
+    discountRate: 100,
+    translations: {}
+  });
   const { toast } = useToast();
 
   const fetchInitialData = async () => {
@@ -36,6 +41,24 @@ export const MembershipManagement: React.FC = () => {
     }
   };
 
+  const handleSave = async () => {
+    try {
+      const res = await fetch('/api/v1/plugins/proxy/membership/tiers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingTier)
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: "保存成功" });
+        fetchInitialData();
+        setEditingTier({ name: '', discountRate: 100, translations: {} });
+      }
+    } catch (e) {
+      toast({ title: "保存失败", variant: "destructive" });
+    }
+  };
+
   useEffect(() => {
     fetchInitialData();
   }, []);
@@ -52,9 +75,12 @@ export const MembershipManagement: React.FC = () => {
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900">会员等级体系</h1>
-          <p className="text-slate-500 mt-1">管理多语种下的会员等级名、折扣率与调价引擎参数。</p>
+          <p className="text-slate-500 mt-1">管理多语种下的会员等级名、折扣率与定价 Hook 参数。</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100 rounded-xl px-6">
+        <Button 
+          className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100 rounded-xl px-6"
+          onClick={() => setEditingTier({ name: '', discountRate: 100, translations: {} })}
+        >
           <Plus size={16} className="mr-2" />
           创建新等级
         </Button>
@@ -66,7 +92,7 @@ export const MembershipManagement: React.FC = () => {
           <CardHeader className="bg-slate-50/50 border-b border-slate-100">
             <CardTitle className="text-lg flex items-center gap-2">
               <RefreshCcw size={18} className="text-blue-500" />
-              实时资产分布
+              实时等级分布
             </CardTitle>
             <CardDescription>当前系统已激活 {tiers.length} 个会员等级，均已注入 Pricing Hook。</CardDescription>
           </CardHeader>
@@ -76,7 +102,7 @@ export const MembershipManagement: React.FC = () => {
                 <TableRow>
                   <TableHead className="px-6">基准名称</TableHead>
                   <TableHead>折扣率</TableHead>
-                  <TableHead>多语言预览</TableHead>
+                  <TableHead>语种覆盖</TableHead>
                   <TableHead className="text-right px-6">操作</TableHead>
                 </TableRow>
               </TableHeader>
@@ -85,25 +111,42 @@ export const MembershipManagement: React.FC = () => {
                   <TableRow key={tier.id} className="hover:bg-blue-50/30 transition-colors">
                     <TableCell className="px-6 py-4">
                       <div className="font-bold text-slate-800">{tier.name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono uppercase tracking-tighter">TIER_ID: {tier.id}</div>
+                      <div className="text-[10px] text-slate-400 font-mono uppercase tracking-tighter">ID: {tier.id}</div>
                     </TableCell>
                     <TableCell>
                        <Badge className="bg-orange-50 text-orange-700 border-orange-100 px-3 py-1 rounded-full">
-                         {tier.discountRate}% OFF
+                         {tier.discountRate}% (Rate)
                        </Badge>
                     </TableCell>
                     <TableCell>
                        <div className="flex gap-1">
-                         {langs.map(l => (
-                           <Badge key={l.code} variant="outline" className="text-[10px] py-0 h-5">
-                             {l.code}
-                           </Badge>
-                         ))}
+                         {langs.map(l => {
+                           const hasTrans = tier.translations?.some((t: any) => t.langCode === l.code);
+                           return (
+                            <Badge 
+                              key={l.code} 
+                              variant={hasTrans ? "default" : "outline"} 
+                              className={`text-[10px] py-0 h-5 ${hasTrans ? 'bg-blue-500' : ''}`}
+                            >
+                              {l.code}
+                            </Badge>
+                           );
+                         })}
                        </div>
                     </TableCell>
                     <TableCell className="text-right px-6">
-                       <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">编辑</Button>
-                       <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-500 hover:bg-red-50">删除</Button>
+                       <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-blue-600 hover:text-blue-700"
+                        onClick={() => {
+                          const transMap: any = {};
+                          tier.translations?.forEach((t: any) => transMap[t.langCode] = t.name);
+                          setEditingTier({ ...tier, translations: transMap });
+                        }}
+                       >
+                         编辑
+                       </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -112,27 +155,43 @@ export const MembershipManagement: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* 右侧：动态 I18n 编辑面板 (演示用) */}
+        {/* 右侧：动态 I18n 编辑面板 */}
         <Card className="border-slate-200/60 shadow-xl shadow-slate-100/50 rounded-2xl h-fit border-l-4 border-l-blue-500">
            <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Languages size={18} className="text-blue-500" />
-                多语言动态录入
+                等级属性编辑
               </CardTitle>
               <CardDescription>
-                检测到系统已开启 {langs.length} 种语言。请为各语种定义等级展示名。
+                检测到系统已开启 {langs.length} 种语言。
               </CardDescription>
            </CardHeader>
            <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label className="text-slate-600 font-bold">基准名称 (Internal Title)</Label>
-                <Input placeholder="例如: Gold Member" className="rounded-xl border-slate-200" />
+                <Input 
+                  value={editingTier.name} 
+                  onChange={(e) => setEditingTier({...editingTier, name: e.target.value})}
+                  placeholder="例如: Gold Member" 
+                  className="rounded-xl border-slate-200" 
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-slate-600 font-bold">折扣率 (Discount Rate %)</Label>
+                <Input 
+                  type="number"
+                  value={editingTier.discountRate} 
+                  onChange={(e) => setEditingTier({...editingTier, discountRate: parseInt(e.target.value)})}
+                  placeholder="85" 
+                  className="rounded-xl border-slate-200" 
+                />
               </div>
 
               <div className="space-y-4 pt-4 border-t border-slate-100">
                 <Label className="text-blue-600 font-bold flex items-center gap-2">
                   <Save size={14} />
-                  翻译矩阵 (Transaltion Matrix)
+                  多语言翻译 (I18n)
                 </Label>
                 
                 <Tabs defaultValue={langs[0]?.code} className="w-full">
@@ -147,15 +206,26 @@ export const MembershipManagement: React.FC = () => {
                     <TabsContent key={l.code} value={l.code} className="pt-4 space-y-3">
                        <div className="space-y-1.5">
                          <Label className="text-xs text-slate-500">在 {l.name} 下的展示名称</Label>
-                         <Input placeholder={`${l.name} Display Name...`} className="rounded-xl bg-slate-50/50 border-slate-100" />
+                         <Input 
+                          value={editingTier.translations[l.code] || ''}
+                          onChange={(e) => {
+                            const newTrans = { ...editingTier.translations, [l.code]: e.target.value };
+                            setEditingTier({ ...editingTier, translations: newTrans });
+                          }}
+                          placeholder={`${l.name} 显示名...`} 
+                          className="rounded-xl bg-slate-50/50 border-slate-100" 
+                         />
                        </div>
                     </TabsContent>
                   ))}
                 </Tabs>
               </div>
 
-              <Button className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-6 font-bold shadow-lg shadow-slate-200">
-                 同步至全域语种库
+              <Button 
+                className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-6 font-bold shadow-lg shadow-slate-200"
+                onClick={handleSave}
+              >
+                 同步等级配置
               </Button>
            </CardContent>
         </Card>

@@ -1,9 +1,8 @@
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, primaryKey } from 'drizzle-orm/sqlite-core';
 import { members } from '../../../db/schema/members';
 
 /**
  * 1. 用户画像表 (p_member_profiles)
- * 支持 B2C/B2B 模式，支持多租户逻辑隔离
  */
 export const pMemberProfiles = sqliteTable('p_member_profiles', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -44,8 +43,8 @@ export const pMemberAddresses = sqliteTable('p_member_addresses', {
 export const pMemberTiers = sqliteTable('p_member_tiers', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   tenantId: integer('tenant_id').notNull(),
-  name: text('name').notNull(), // 如: VIP, Gold
-  discountRate: integer('discount_rate').notNull().default(100), // 85折即 85
+  name: text('name').notNull(), // 基准名称
+  discountRate: integer('discount_rate').notNull().default(100),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 }, (t) => ({
   tenantIdx: index('p_tier_tenant_idx').on(t.tenantId),
@@ -56,8 +55,8 @@ export const pMemberTiers = sqliteTable('p_member_tiers', {
  */
 export const pMemberTiersI18n = sqliteTable('p_member_tiers_i18n', {
   tierId: integer('tier_id').notNull().references(() => pMemberTiers.id, { onDelete: 'cascade' }),
-  langCode: text('lang_code').notNull(), // 如: 'zh-CN', 'en-US'
-  name: text('name').notNull(),          // 翻译后的名称
+  langCode: text('lang_code').notNull(),
+  name: text('name').notNull(),
 }, (t) => ({
-  pk: [t.tierId, t.langCode],
+  pk: primaryKey({ columns: [t.tierId, t.langCode] }),
 }));

@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import Database from 'better-sqlite3';
-import * as schema from '../../db/schema';
+import * as schema from '../../db/schema.ts';
 
 /**
  * 模拟 D1 接口的包装器 (针对 better-sqlite3)
@@ -126,7 +126,7 @@ export function createTestDb() {
       description TEXT, 
       created_at INTEGER
     );
-    CREATE TABLE IF NOT EXISTS permissions (slug TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, perm_category TEXT);
+    CREATE TABLE IF NOT EXISTS permissions (slug TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, perm_category TEXT, plugin_slug TEXT);
     CREATE TABLE IF NOT EXISTS role_permissions (role_id INTEGER NOT NULL, permission_slug TEXT NOT NULL, PRIMARY KEY(role_id, permission_slug));
     CREATE TABLE IF NOT EXISTS admins (id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, hashed_password TEXT NOT NULL, created_at INTEGER);
     CREATE TABLE IF NOT EXISTS admin_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, expires_at INTEGER NOT NULL);
@@ -225,6 +225,13 @@ export function createTestDb() {
       created_at INTEGER
     );
     CREATE INDEX IF NOT EXISTS p_tier_tenant_idx ON p_member_tiers (tenant_id);
+
+    CREATE TABLE IF NOT EXISTS p_member_tiers_i18n (
+      tier_id INTEGER NOT NULL,
+      lang_code TEXT NOT NULL,
+      name TEXT NOT NULL,
+      PRIMARY KEY (tier_id, lang_code)
+    );
   `;
   
   sqlite.exec(schemaSql);

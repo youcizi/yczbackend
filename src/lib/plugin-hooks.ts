@@ -2,7 +2,7 @@
  * 系统钩子管理器 (Plugin Hook System)
  * 允许插件订阅系统关键生命周期事件并干预结果
  */
-export type SystemHookType = 'pricing:calculate' | 'member:after_register' | 'order:before_create';
+export type SystemHookType = 'pricing:calculate' | 'member:after_register' | 'order:before_create' | 'order:pricing';
 
 export interface HookContext {
   db: any;
@@ -38,6 +38,13 @@ class HookManager {
     }
 
     return currentData;
+  }
+  /**
+   * 清理所有钩子 (主要用于测试环境)
+   */
+  public clear() {
+    this.handlers.clear();
+    console.log('🧹 [Hook] 所有钩子已清空');
   }
 }
 

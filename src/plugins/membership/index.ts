@@ -4,16 +4,24 @@ import { createDbClient } from '../../db';
 
 /**
  * [CLIENT] Storefront Frontend API 
- * 云端商城/移动端专用路由
  * 挂载点: /api/v1/s/membership
  */
 const sfApp = new Hono<{ Bindings: any }>();
 
-// 身份从主网关 c.get('current_member') 获取
+// 身份共享：直接使用网关解析出的 current_member 上下文
+sfApp.get('/my-tier', async (c) => {
+  const db = await createDbClient(c.env.DB);
+  const member = c.get('current_member' as any);
+  const domains = c.get('domains' as any) || { id: 1 }; 
+  const lang = c.req.header('X-Language') || 'en-US';
+  
+  const tier = await MembershipService.getMyTier(db, domains.id, member.id, lang);
+  return c.json({ success: true, data: tier });
+});
+
 sfApp.get('/profile', async (c) => {
   const db = await createDbClient(c.env.DB);
   const member = c.get('current_member' as any);
-  // 从域名调度中间件获取租户上下文
   const domains = c.get('domains' as any) || { id: 1 }; 
   
   const profile = await MembershipService.getProfile(db, domains.id, member.id);
@@ -24,7 +32,6 @@ sfApp.get('/profile', async (c) => {
 
 /**
  * [ADMIN] Plugin Management API
- * 插件管理后台专用路由
  * 挂载点: /api/v1/plugins/proxy/membership
  */
 const adminApp = new Hono<{ Bindings: any }>();
@@ -36,7 +43,13 @@ adminApp.get('/tiers', async (c) => {
   return c.json({ success: true, data: tiers });
 });
 
-// 开发文档要求的导出格式
+adminApp.post('/tiers', async (c) => {
+  const db = await createDbClient(c.env.DB);
+  const body = await c.req.json();
+  const result = await MembershipService.saveTier(db, 1, body);
+  return c.json({ success: true, data: result });
+});
+
 export default {
   admin: adminApp,
   storefront: sfApp,
