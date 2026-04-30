@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SystemConfigProvider } from '../../contexts/SystemConfigContext';
 import { 
   Dialog, 
@@ -14,7 +14,7 @@ import { Label } from '../ui/Label';
 import { Select, SelectItem } from '../ui/Select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { Plus, Edit, Trash2, Shield, User, Loader2, Key, Database, Mail, Clock } from 'lucide-react';
+import { Plus, Edit, Trash2, Shield, User, Loader2, Key, Database, Mail, Clock, Settings, X } from 'lucide-react';
 
 export interface SystemUser {
   id: string;
@@ -42,6 +42,12 @@ export const AdminList: React.FC<UserListProps> = ({
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('list');
+
+  // 等级配置相关
+  const [levelConfigs, setLevelConfigs] = useState<{level: number, name: string}[]>([]);
+  const [isLevelConfigOpen, setIsLevelConfigOpen] = useState(false);
+  const [tempLevels, setTempLevels] = useState<{level: number, name: string}[]>([]);
 
   // 表单状态
   const [formData, setFormData] = useState({
@@ -51,13 +57,50 @@ export const AdminList: React.FC<UserListProps> = ({
     status: 'active' as SystemUser['status']
   });
 
+  // 获取等级配置
+  const fetchLevelConfigs = async () => {
+    try {
+      const res = await fetch('/api/v1/settings/member_levels');
+      const result = await res.json();
+      if (result.success) {
+        setLevelConfigs(result.data);
+        setTempLevels(result.data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch level configs');
+    }
+  };
+
+  useEffect(() => {
+    fetchLevelConfigs();
+  }, []);
+
+  const saveLevelConfigs = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/v1/settings/member_levels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tempLevels)
+      });
+      if (res.ok) {
+        setLevelConfigs(tempLevels);
+        setIsLevelConfigOpen(false);
+      }
+    } catch (e) {
+      setError('保存等级配置失败');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const openAddDialog = () => {
     setEditingUser(null);
     setError(null);
     setFormData({
       email: '',
       password: '',
-      level: 1,
+      level: levelConfigs[0]?.level || 1,
       status: 'active'
     });
     setIsOpen(true);
@@ -129,29 +172,37 @@ export const AdminList: React.FC<UserListProps> = ({
     }
   };
 
+  const getLevelName = (level: number) => {
+    return levelConfigs.find(l => l.level === level)?.name || `等级 ${level}`;
+  };
+
   return (
     <SystemConfigProvider config={{ activePlugins }}>
       <div className="flex flex-col gap-6">
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">系统用户管理</h1>
-            <p className="text-slate-500 mt-2 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-              管理前台会员账号、等级与权限状态
-            </p>
-          </div>
-          
-          <Button onClick={openAddDialog} className="bg-blue-600 hover:bg-blue-700 text-white shadow-md">
-            <Plus className="w-4 h-4 mr-2" />
-            添加新用户
-          </Button>
-        </header>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <div className="flex justify-between items-center mb-6">
+            <TabsList className="bg-slate-100/50 p-1 rounded-xl">
+              <TabsTrigger value="list" className="rounded-lg px-6 py-2 transition-all">用户列表</TabsTrigger>
+              <TabsTrigger value="api" className="rounded-lg px-6 py-2 transition-all">API 管理</TabsTrigger>
+            </TabsList>
 
-        <Tabs defaultValue="list" className="w-full">
-          <TabsList className="mb-4 bg-slate-100/50 p-1 rounded-xl">
-            <TabsTrigger value="list" className="rounded-lg px-6 py-2 transition-all">用户列表</TabsTrigger>
-            <TabsTrigger value="api" className="rounded-lg px-6 py-2 transition-all">API 管理</TabsTrigger>
-          </TabsList>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsLevelConfigOpen(true)}
+                className="border-slate-200 text-slate-600 hover:bg-slate-50"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                等级配置
+              </Button>
+              {activeTab === 'list' && (
+                <Button onClick={openAddDialog} className="bg-blue-600 hover:bg-blue-700 text-white shadow-md">
+                  <Plus className="w-4 h-4 mr-2" />
+                  添加新用户
+                </Button>
+              )}
+            </div>
+          </div>
 
           <TabsContent value="list" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -164,7 +215,7 @@ export const AdminList: React.FC<UserListProps> = ({
                 <div className="text-2xl font-black text-emerald-600">{users.filter(u => u.status === 'active').length}</div>
               </div>
               <div className="p-6 bg-white rounded-xl border border-slate-100 shadow-sm">
-                <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">活跃等级(Avg)</div>
+                <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">平均等级</div>
                 <div className="text-2xl font-black text-blue-600">
                   {users.length > 0 
                     ? (users.reduce((acc, u) => acc + (u.level || 0), 0) / users.length).toFixed(1) 
@@ -188,16 +239,21 @@ export const AdminList: React.FC<UserListProps> = ({
                   {users.map((user) => (
                     <tr key={user.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                            <User className="w-4 h-4" />
-                          </div>
-                          <span className="font-medium text-slate-900">{user.email}</span>
-                        </div>
+                        <button 
+                          onClick={() => openEditDialog(user)}
+                          className="flex items-center gap-3 hover:text-blue-600 transition-colors"
+                        >
+                          <span className="font-medium text-slate-900 group-hover:text-blue-600">{user.email}</span>
+                        </button>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="inline-flex items-center justify-center min-w-[2.5rem] px-2 py-1 bg-slate-100 text-slate-700 rounded-md font-bold text-xs">
-                          LV.{user.level || 1}
+                        <span className="inline-flex flex-col items-center gap-0.5">
+                          <span className="inline-flex items-center justify-center min-w-[2.5rem] px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md font-bold text-[10px]">
+                            LV.{user.level || 1}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {getLevelName(user.level)}
+                          </span>
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -269,7 +325,76 @@ export const AdminList: React.FC<UserListProps> = ({
           </TabsContent>
         </Tabs>
 
-        {/* 表单弹窗 */}
+        {/* 会员等级配置弹窗 */}
+        <Dialog open={isLevelConfigOpen} onOpenChange={setIsLevelConfigOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>会员等级体系配置</DialogTitle>
+              <DialogDescription>
+                定义系统中会员的等级阶梯及其名称。保存后，添加或编辑用户时将只能选择此处定义的等级。
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="max-h-[300px] overflow-y-auto space-y-3 pr-2">
+                {tempLevels.map((l, index) => (
+                  <div key={index} className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex flex-col gap-1 flex-1">
+                      <Label className="text-[10px] text-slate-400 uppercase font-bold">等级值 (Key)</Label>
+                      <Input 
+                        type="number" 
+                        value={l.level} 
+                        onChange={(e) => {
+                          const newLevels = [...tempLevels];
+                          newLevels[index].level = parseInt(e.target.value) || 0;
+                          setTempLevels(newLevels);
+                        }}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1 flex-[2]">
+                      <Label className="text-[10px] text-slate-400 uppercase font-bold">等级名称 (Value)</Label>
+                      <Input 
+                        value={l.name} 
+                        onChange={(e) => {
+                          const newLevels = [...tempLevels];
+                          newLevels[index].name = e.target.value;
+                          setTempLevels(newLevels);
+                        }}
+                        placeholder="例如：黄金会员"
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <button 
+                      onClick={() => setTempLevels(tempLevels.filter((_, i) => i !== index))}
+                      className="mt-5 p-1 text-slate-400 hover:text-red-500 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              
+              <Button 
+                variant="outline" 
+                onClick={() => setTempLevels([...tempLevels, { level: (tempLevels[tempLevels.length-1]?.level || 0) + 1, name: '' }])}
+                className="w-full border-dashed border-2 hover:border-blue-300 hover:text-blue-600 transition-all"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                新增等级阶梯
+              </Button>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsLevelConfigOpen(false)}>取消</Button>
+              <Button onClick={saveLevelConfigs} loading={isLoading} className="bg-blue-600 hover:bg-blue-700">
+                保存配置
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* 用户表单弹窗 */}
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
@@ -299,18 +424,20 @@ export const AdminList: React.FC<UserListProps> = ({
 
               <div className="space-y-2">
                 <Label htmlFor="level">会员等级</Label>
-                <div className="flex items-center gap-3">
-                   <Input 
-                    id="level" 
-                    type="number"
-                    min="1"
-                    max="99"
-                    value={formData.level}
-                    onChange={(e) => setFormData({ ...formData, level: parseInt(e.target.value) || 1 })}
-                    className="w-24"
-                  />
-                  <span className="text-xs text-slate-400 font-medium">当前设定的会员阶梯等级</span>
-                </div>
+                <Select 
+                  value={formData.level.toString()}
+                  onValueChange={(val) => setFormData({ ...formData, level: parseInt(val) })}
+                >
+                  {levelConfigs.length > 0 ? (
+                    levelConfigs.map(l => (
+                      <SelectItem key={l.level} value={l.level.toString()}>
+                        LV.{l.level} - {l.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="1">默认等级 (请先配置)</SelectItem>
+                  )}
+                </Select>
               </div>
 
               <div className="space-y-2">

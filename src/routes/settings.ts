@@ -232,4 +232,48 @@ settingsRoutes.post('/site_domains', requirePermission(['settings.general', 'rol
   return c.json({ success: true });
 });
 
+// GET /api/v1/settings/member_levels
+settingsRoutes.get('/member_levels', async (c) => {
+  const db = await createDbClient(c.env.DB);
+  const record = await db.query.systemSettings.findFirst({
+    where: eq(systemSettings.key, 'member_levels')
+  });
+
+  if (!record) {
+    const defaultLevels = [
+      { level: 1, name: '普通会员' },
+      { level: 2, name: '铜牌会员' },
+      { level: 3, name: '银牌会员' },
+      { level: 4, name: '金牌会员' },
+      { level: 5, name: '钻石会员' }
+    ];
+    return c.json({ success: true, data: defaultLevels });
+  }
+
+  return c.json({ success: true, data: JSON.parse(record.value) });
+});
+
+// POST /api/v1/settings/member_levels
+settingsRoutes.post('/member_levels', requirePermission(['settings.general', 'role.manage']), async (c) => {
+  const body = await c.req.json();
+  const db = await createDbClient(c.env.DB);
+  
+  const existing = await db.query.systemSettings.findFirst({
+    where: eq(systemSettings.key, 'member_levels')
+  });
+
+  const valueStr = JSON.stringify(body);
+
+  if (existing) {
+    await db.update(systemSettings)
+      .set({ value: valueStr, updatedAt: new Date() })
+      .where(eq(systemSettings.key, 'member_levels'));
+  } else {
+    await db.insert(systemSettings)
+      .values({ key: 'member_levels', value: valueStr });
+  }
+
+  return c.json({ success: true });
+});
+
 export default settingsRoutes;

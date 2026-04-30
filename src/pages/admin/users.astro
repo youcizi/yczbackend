@@ -1,10 +1,10 @@
 ---
-import { env } from 'cloudflare:workers';
-import DashboardLayout from '../../layouts/DashboardLayout.astro';
-import { SystemConfigProvider } from '../../contexts/SystemConfigContext';
-import { PluginService } from '../../services/PluginService';
-import { AdminList } from '../../components/admin/AdminList';
-import { createDbClient, schema, eq } from '../../db';
+import { env } from "cloudflare:workers";
+import DashboardLayout from "../../layouts/DashboardLayout.astro";
+import { SystemConfigProvider } from "../../contexts/SystemConfigContext";
+import { PluginService } from "../../services/PluginService";
+import { AdminList } from "../../components/admin/AdminList";
+import { createDbClient, schema, eq } from "../../db";
 
 /**
  * 管理员列表页面 (Core Identity Layer)
@@ -16,25 +16,27 @@ const db = await createDbClient(env.DB);
 
 // 2. 拉取已启用的插件列表 (用于前端门控)
 const enabledPlugins = await PluginService.getEnabledPlugins(db);
-const activeSlugs = enabledPlugins.map(p => p.slug);
+const activeSlugs = enabledPlugins.map((p) => p.slug);
 
 // 3. 拉取系统全量用户数据 (核心身份层：Admin + Member)
-const userData = await db.select({
-  id: schema.users.id,
-  email: schema.users.email,
-  userType: schema.users.userType,
-  status: schema.users.status,
-  createdAt: schema.users.createdAt,
-  // 核心字段：如果是管理员，关联获取其用户名
-  username: schema.admins.username,
-})
-.from(schema.users)
-.leftJoin(schema.admins, eq(schema.users.id, schema.admins.id))
-.all();
+const userData = await db
+  .select({
+    id: schema.users.id,
+    email: schema.users.email,
+    userType: schema.users.userType,
+    status: schema.users.status,
+    createdAt: schema.users.createdAt,
+    username: schema.admins.username,
+    level: schema.members.level,
+  })
+  .from(schema.users)
+  .leftJoin(schema.admins, eq(schema.users.id, schema.admins.id))
+  .leftJoin(schema.members, eq(schema.users.id, schema.members.id))
+  .all();
 ---
 
 <DashboardLayout title="用户管理">
-  <div class="admin-page-container p-4 md:p-8 max-w-7xl mx-auto">
+  <div class="admin-page-container p-4 max-w-7xl mx-auto">
     <!-- 列表与管理组件 (内置了 Header 和 Stats) -->
     <main>
       <AdminList users={userData} activePlugins={activeSlugs} client:load />
