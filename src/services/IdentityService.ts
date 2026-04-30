@@ -13,41 +13,51 @@ export class IdentityService {
     email: string, 
     password: string, 
     userType: 'admin' | 'member', 
-    username?: string 
+    username?: string,
+    level?: number 
   }) {
     const db = await createDbClient(d1);
     const userId = generateId(15);
     const passwordHash = await passwordHasher.hash(data.password);
 
-    // 开启事务确保数据一致性
-    const user = await db.transaction(async (tx: any) => {
-      // 1. 创建核心认证记录
-      await tx.insert(schema.users).values({
+    // [Cloudflare D1 兼容性修复]：使用 db.batch() 替代 db.transaction() 以避免 'Failed query: begin' 错误
+    const batchQueries: any[] = [];
+
+    // 1. 核心认证记录
+    batchQueries.push(
+      db.insert(schema.users).values({
         id: userId,
         tenantId: data.tenantId,
         email: data.email,
         passwordHash,
         userType: data.userType,
         status: 'active'
-      }).run();
+      })
+    );
 
-      // 2. 创建业务关联记录
-      if (data.userType === 'admin') {
-        await tx.insert(schema.admins).values({
+    // 2. 业务关联记录
+    if (data.userType === 'admin') {
+      batchQueries.push(
+        db.insert(schema.admins).values({
           id: userId,
           username: data.username || data.email.split('@')[0],
-        }).run();
-      } else {
-        await tx.insert(schema.members).values({
+        })
+      );
+    } else {
+      batchQueries.push(
+        db.insert(schema.members).values({
           id: userId,
           type: 'registered',
-          level: 1
-        }).run();
-      }
+          level: data.level || 1
+        })
+      );
+    }
 
-      // 3. 获取完整用户信息用于返回
-      return await tx.select().from(schema.users).where(eq(schema.users.id, userId)).get();
-    });
+    // 3. 执行批量操作
+    await db.batch(batchQueries as any);
+
+    // 4. 获取完整用户信息用于返回
+    const user = await db.select().from(schema.users).where(eq(schema.users.id, userId)).get();
 
     // 🚀 核心钩子：身份注册完成 (用于插件扩展逻辑)
     if (user) {

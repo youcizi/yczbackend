@@ -34,6 +34,13 @@ const CORE_PERMISSIONS: PermissionDef[] = [
   { slug: 'settings.general', name: '常规设置', permCategory: '系统设置', description: '读取和修改站点常规配置项' },
   { slug: 'settings.mail', name: '邮件服务配置', permCategory: '系统设置', description: '配置 SMTP / SendGrid 等邮件发送服务' },
   { slug: 'settings.ai', name: 'AI 网关配置', permCategory: '系统设置', description: '管理 AI 提供商及模型分发矩阵' },
+
+  // 用户管理 (Core Identity)
+  { slug: 'user.view', name: '查看用户', permCategory: '用户管理', description: '允许查看前台会员列表' },
+  { slug: 'user.create', name: '创建用户', permCategory: '用户管理', description: '允许添加新会员' },
+  { slug: 'user.update', name: '编辑用户', permCategory: '用户管理', description: '允许修改会员资料与状态' },
+  { slug: 'user.delete', name: '删除用户', permCategory: '用户管理', description: '允许移除会员账号' },
+  { slug: 'user.api_manage', name: 'API 管理', permCategory: '用户管理', description: '允许管理会员的 API 访问权限' },
 ];
 
 const CORE_SLUGS = CORE_PERMISSIONS.map(p => p.slug);

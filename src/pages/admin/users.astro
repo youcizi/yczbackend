@@ -35,40 +35,7 @@ const userData = await db.select({
 
 <DashboardLayout title="用户管理">
   <div class="admin-page-container p-4 md:p-8 max-w-7xl mx-auto">
-    <!-- 头部区域 -->
-    <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-      <div>
-        <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">用户管理基座</h1>
-        <p class="text-slate-500 mt-2 flex items-center gap-2">
-          <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
-          系统级核心身份模块 · 管理系统用户账号
-        </p>
-      </div>
-      
-      <div class="flex gap-3">
-        <a href="/api/auth/seed-users" class="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
-          重置用户数据
-        </a>
-      </div>
-    </header>
-
-    <!-- 统计卡片 -->
-    <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      <div class="p-6 bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">总计用户</div>
-        <div class="text-2xl font-black text-slate-900">{userData.length}</div>
-      </div>
-      <div class="p-6 bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">管理员</div>
-        <div class="text-2xl font-black text-blue-600">{userData.filter(u => u.userType === 'admin').length}</div>
-      </div>
-      <div class="p-6 bg-white rounded-xl border border-slate-100 shadow-sm">
-        <div class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">普通用户</div>
-        <div class="text-2xl font-black text-amber-600">{userData.filter(u => u.userType === 'member').length}</div>
-      </div>
-    </section>
-
-    <!-- 列表组件 -->
+    <!-- 列表与管理组件 (内置了 Header 和 Stats) -->
     <main>
       <AdminList users={userData} activePlugins={activeSlugs} client:load />
     </main>

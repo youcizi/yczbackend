@@ -9,6 +9,7 @@ import publicApi from './routes/public-api';
 import settings from './routes/settings';
 import infra from './routes/infra';
 import plugins from './routes/api/v1/plugins';
+import users from './routes/api/v1/users';
 import ai, { publicAiGateway } from './routes/ai';
 import { validateConfig } from './lib/config';
 import { getAuthInstances } from './lib/auth';
@@ -256,6 +257,7 @@ function createAdminApp() {
   v1.route('/settings', settings);
   v1.route('/infra', infra);
   v1.route('/plugins', plugins);
+  v1.route('/users', users);
   v1.all('/s/*', async (c) => {
     // 延迟加载商城网关枢纽 (已重构为全动态 Hub)
     const sf = (await import('./routes/front-api')).default;

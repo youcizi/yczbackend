@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { admins, roles, permissions, rolePermissions, adminsToRoles, languages } from '../db/schema';
-import { createDbClient } from '../db';
+import { createDbClient, schema } from '../db';
 import { passwordHasher } from '../lib/auth';
 import { initCorePermissions, registry } from '../lib/permission-registry';
 
@@ -58,26 +58,36 @@ export const seedAdmin = async (d1: any, password?: string) => {
   // 4. 获取或创建管理员账号
   const adminId = "super-admin-01";
   
-  // 先尝试按用户名查找
-  let existingAdmin = await db.select().from(admins).where(eq(admins.username, username)).get();
+  // 先尝试按 ID 或用户名查找
+  let existingUser = await db.select().from(admins).where(eq(admins.username, username)).get();
   
-  if (!existingAdmin) {
-    await db.insert(admins).values({
-      id: adminId,
-      username,
-      hashedPassword: hashedPassword,
-    }).run();
-    existingAdmin = await db.select().from(admins).where(eq(admins.username, username)).get();
+  if (!existingUser) {
+    // 必须同步插入核心认证表和管理员业务表
+    await db.batch([
+      db.insert(schema.users).values({
+        id: adminId,
+        tenantId: 0,
+        email: 'admin@system.com',
+        passwordHash: hashedPassword,
+        userType: 'admin',
+        status: 'active'
+      }).onConflictDoNothing(),
+      db.insert(admins).values({
+        id: adminId,
+        username,
+      }).onConflictDoNothing()
+    ]);
+    existingUser = await db.select().from(admins).where(eq(admins.username, username)).get();
   }
 
   // 5. 绑定管理员到角色
-  if (existingAdmin) {
+  if (existingUser) {
     const existingBinding = await db.select().from(adminsToRoles)
-      .where(eq(adminsToRoles.adminId, existingAdmin.id))
+      .where(eq(adminsToRoles.adminId, existingUser.id))
       .get();
     if (!existingBinding) {
       await db.insert(adminsToRoles).values({
-        adminId: existingAdmin.id,
+        adminId: existingUser.id,
         roleId: 1,
         tenantId: 0
       }).run();
