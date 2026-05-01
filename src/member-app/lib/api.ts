@@ -21,6 +21,16 @@ export const memberApi = {
     });
     return res.json();
   },
+  
+  // 发送验证码
+  async sendCode(email: string) {
+    const res = await fetch('/api/auth/member/send-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    return res.json();
+  },
 
   // 获取个人资料
   async getProfile() {

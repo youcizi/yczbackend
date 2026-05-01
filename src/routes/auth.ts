@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { getAuthInstances, passwordHasher } from '../lib/auth';
-import { createDbClient, schema, eq, sql, and } from '../db';
+import { createDbClient, schema, eq, sql, and, desc } from '../db';
 import { generateId } from 'lucia';
 import { seedAdmin } from '../core/seed';
 
@@ -145,12 +145,70 @@ auth.post('/member/login', async (c) => {
 });
 
 /**
+ * 发送验证码接口
+ */
+auth.post('/member/send-code', async (c) => {
+  const { email } = await c.req.json();
+  if (!email) return c.json({ error: '邮箱不能为空' }, 400);
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const db = await createDbClient(c.env.DB);
+  const { MailService } = await import('../services/MailService');
+
+  // 1. 存入数据库，有效期 10 分钟
+  await db.insert(schema.verificationCodes).values({
+    email,
+    code,
+    type: 'register',
+    expiresAt: new Date(Date.now() + 10 * 60 * 1000)
+  });
+
+  // 2. 发送邮件
+  try {
+    await MailService.sendMail(c.env, {
+      to: email,
+      subject: '您的注册验证码',
+      html: `
+        <div style="font-family: Arial; padding: 20px;">
+          <h2>欢迎注册</h2>
+          <p>您的验证码是：<strong style="font-size: 24px; color: #2563eb;">${code}</strong></p>
+          <p>有效期为 10 分钟，请尽快完成注册。</p>
+        </div>
+      `,
+      senderName: 'YCZ.ME 独立站系统'
+    });
+    return c.json({ success: true, message: '验证码已发送' });
+  } catch (err: any) {
+    console.error('Send code failed:', err);
+    return c.json({ error: '验证码发送失败: ' + err.message }, 500);
+  }
+});
+
+/**
  * 会员注册接口
  */
 auth.post('/member/register', async (c) => {
-  const { email, password } = await c.req.json();
+  const { email, password, code } = await c.req.json();
+  if (!code) return c.json({ error: '请填写验证码' }, 400);
+
   const { IdentityService } = await import('../services/IdentityService');
+  const db = await createDbClient(c.env.DB);
   
+  // 1. 校验验证码
+  const record = await db.query.verificationCodes.findFirst({
+    where: (vc, { eq, and, gt }) => and(
+      eq(vc.email, email),
+      eq(vc.code, code),
+      eq(vc.type, 'register'),
+      gt(vc.expiresAt, new Date())
+    ),
+    orderBy: (vc, { desc }) => [desc(vc.createdAt)]
+  });
+
+  if (!record) {
+    return c.json({ error: '验证码错误或已过期' }, 400);
+  }
+
   const domains = c.get('site_domains' as any) || c.get('domains' as any);
   let tenantId = domains?.tenant_id || domains?.id || 1;
 
@@ -162,6 +220,10 @@ auth.post('/member/register', async (c) => {
       userType: 'member',
       level: 1
     });
+
+    // 2. 注册成功后使验证码失效
+    await db.delete(schema.verificationCodes).where(eq(schema.verificationCodes.id, record.id));
+
     return c.json({ success: true, userId: user.id });
   } catch (err: any) {
     return c.json({ error: err.message }, 400);

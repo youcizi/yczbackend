@@ -20,6 +20,19 @@ export class IdentityService {
     const userId = generateId(15);
     const passwordHash = await passwordHasher.hash(data.password);
 
+    // 0. 检查邮箱是否已存在 (防重复注册)
+    const existing = await db.select()
+      .from(schema.users)
+      .where(and(
+        eq(schema.users.email, data.email),
+        eq(schema.users.tenantId, data.tenantId)
+      ))
+      .get();
+
+    if (existing) {
+      throw new Error('该邮箱已注册，请直接登录');
+    }
+
     // [Cloudflare D1 兼容性修复]：使用 db.batch() 替代 db.transaction() 以避免 'Failed query: begin' 错误
     const batchQueries: any[] = [];
 

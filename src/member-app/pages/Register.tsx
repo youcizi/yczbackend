@@ -2,19 +2,51 @@ import React, { useState } from 'react';
 import { memberApi } from '../lib/api';
 
 export const Register: React.FC<{ onNavigate: (p: any) => void }> = ({ onNavigate }) => {
-  const [formData, setFormData] = useState({ email: '', password: '', confirmPassword: '' });
+  const [formData, setFormData] = useState({ email: '', password: '', confirmPassword: '', code: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [isSending, setIsSending] = useState(false);
+
+  const handleSendCode = async () => {
+    if (!formData.email) return setError('请先输入邮箱');
+    setIsSending(true);
+    try {
+      const res = await memberApi.sendCode(formData.email);
+      if (res.error) throw new Error(res.error);
+      setCountdown(60);
+      const timer = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
       return setError('两次输入的密码不一致');
     }
+    if (!formData.code) {
+      return setError('请输入验证码');
+    }
     setLoading(true);
     setError('');
     try {
-      const res = await memberApi.register({ email: formData.email, password: formData.password });
+      const res = await memberApi.register({ 
+        email: formData.email, 
+        password: formData.password,
+        code: formData.code
+      });
       if (res.error) throw new Error(res.error);
       alert('注册成功，请登录');
       onNavigate('login');
@@ -57,6 +89,29 @@ export const Register: React.FC<{ onNavigate: (p: any) => void }> = ({ onNavigat
                 onChange={e => setFormData({ ...formData, email: e.target.value })}
               />
             </div>
+            
+            <div>
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-400 ml-1">验证码</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  required
+                  className="mt-1 block flex-1 rounded-2xl border-none bg-white px-5 py-4 text-slate-900 shadow-sm ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-600 outline-none transition-all"
+                  placeholder="6位验证码"
+                  value={formData.code}
+                  onChange={e => setFormData({ ...formData, code: e.target.value })}
+                />
+                <button
+                  type="button"
+                  onClick={handleSendCode}
+                  disabled={countdown > 0 || isSending}
+                  className="mt-1 px-4 rounded-2xl bg-slate-100 text-sm font-bold text-slate-600 hover:bg-slate-200 disabled:opacity-50 transition-all whitespace-nowrap"
+                >
+                  {countdown > 0 ? `${countdown}s` : isSending ? '发送中...' : '发送验证码'}
+                </button>
+              </div>
+            </div>
+
             <div>
               <label className="text-xs font-bold uppercase tracking-widest text-slate-400 ml-1">设置密码</label>
               <input
