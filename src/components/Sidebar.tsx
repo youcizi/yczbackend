@@ -54,7 +54,46 @@ interface MenuItem {
 
 export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, username, models = [], collections = [] }) => {
   const [dynamicCollections, setDynamicCollections] = useState(collections);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['内容管理']);
+  const [isMounted, setIsMounted] = useState(false);
+
+  const [activeFlyout, setActiveFlyout] = useState<{
+    title: string;
+    items: any[];
+    top: number;
+  } | null>(null);
+
   const [pluginItems, setPluginItems] = useState<any[]>([]);
+
+  // 1. 挂载后从本地存储恢复状态
+  useEffect(() => {
+    const savedCollapsed = localStorage.getItem('admin_sidebar_collapsed');
+    if (savedCollapsed !== null) {
+      setIsCollapsed(savedCollapsed === 'true');
+    }
+
+    const savedExpanded = localStorage.getItem('admin_sidebar_expanded_menus');
+    if (savedExpanded !== null) {
+      try {
+        setExpandedMenus(JSON.parse(savedExpanded));
+      } catch (e) {
+        console.warn('Failed to parse expanded menus from localStorage');
+      }
+    }
+    setIsMounted(true);
+  }, []);
+
+  // 2. 持久化状态变更
+  useEffect(() => {
+    if (!isMounted) return;
+    localStorage.setItem('admin_sidebar_collapsed', String(isCollapsed));
+  }, [isCollapsed, isMounted]);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    localStorage.setItem('admin_sidebar_expanded_menus', JSON.stringify(expandedMenus));
+  }, [expandedMenus, isMounted]);
 
   // 客户端数据刷新逻辑
   const refreshCollections = useCallback(async () => {
@@ -69,9 +108,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
     }
   }, []);
 
-  /**
-   * 刷新插件菜单
-   */
   const refreshPlugins = useCallback(async () => {
     try {
       const res = await fetch('/api/v1/plugins/menu');
@@ -90,15 +126,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
     }
   }, []);
 
-  // 监听全局插件更新事件
   useEffect(() => {
     const handlePluginUpdate = () => {
-      console.log('📡 [Sidebar] Received plugins-updated event, refreshing menus...');
       if (hasPermission(permissions, 'plugins.manage')) {
         refreshPlugins();
       }
     };
-
     window.addEventListener('plugins-updated', handlePluginUpdate);
     return () => window.removeEventListener('plugins-updated', handlePluginUpdate);
   }, [permissions, refreshPlugins]);
@@ -109,7 +142,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
     }
   }, [permissions, refreshPlugins]);
 
-  // 1. 构建动态分级菜单
+  // 点击外部关闭浮动菜单
+  useEffect(() => {
+    if (!activeFlyout) return;
+    const handleClickOutside = () => setActiveFlyout(null);
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => window.removeEventListener('mousedown', handleClickOutside);
+  }, [activeFlyout]);
+
   const groupedCollections = dynamicCollections.reduce((acc: Record<string, any[]>, c) => {
     const groupName = c.menuGroup || '其它内容';
     if (!acc[groupName]) acc[groupName] = [];
@@ -118,10 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
   }, {});
 
   const dynamicGroups = Object.entries(groupedCollections).map(([groupName, items]) => {
-    // 为每个分组构建树形结构
     const tree = buildTree(items, { idKey: 'id', parentKey: 'parentId' });
-    
-    // 递归转换树节点为菜单项格式
     const mapTreeToMenuItems = (nodes: any[]): any[] => {
       return nodes
         .map(node => ({
@@ -146,7 +183,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
 
   const MENU_ITEMS: MenuItem[] = [
     { title: '概览', href: '/admin', icon: LayoutDashboard, requiredPermission: 'site.view' },
-    // NOTE: 线索中心使用独立的 leads.view 权限，而非通用的 site.view
     { title: '线索中心', href: '/admin/leads', icon: Users, requiredPermission: 'leads.view' },
     { title: '用户管理', href: '/admin/users', icon: UserCircle2, requiredPermission: 'site.view' },
     ...dynamicGroups,
@@ -189,34 +225,43 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
     }] : []),
   ];
 
-  const autoExpanded = React.useMemo(() => {
-    const expanded = ['内容管理']; 
+  // 3. 自动计算当前路径所属的父级并保持展开
+  useEffect(() => {
+    const toExpand: string[] = [];
     MENU_ITEMS.forEach(menu => {
       const hasActiveSub = menu.subItems?.some(sub => currentPath === sub.href);
-      if (hasActiveSub && !expanded.includes(menu.title)) {
-        expanded.push(menu.title);
+      if (hasActiveSub && !expandedMenus.includes(menu.title)) {
+        toExpand.push(menu.title);
       }
     });
-    return expanded;
+
+    if (toExpand.length > 0) {
+      setExpandedMenus(prev => {
+        const next = [...prev];
+        toExpand.forEach(title => {
+          if (!next.includes(title)) next.push(title);
+        });
+        return next;
+      });
+    }
   }, [currentPath]);
 
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(autoExpanded);
+  const handleSidebarMenuToggle = (title: string, subItems?: any[], rect?: DOMRect) => {
+    if (isCollapsed && subItems && rect) {
+      setActiveFlyout({
+        title,
+        items: subItems,
+        top: rect.top
+      });
+      return;
+    }
 
-  const handleSidebarMenuToggle = (title: string) => {
     setExpandedMenus(prev =>
       prev.includes(title) ? prev.filter(t => t !== title) : [...prev, title]
     );
   };
 
-  useEffect(() => {
-    setExpandedMenus(prev => {
-      const next = [...prev];
-      autoExpanded.forEach(title => {
-        if (!next.includes(title)) next.push(title);
-      });
-      return next;
-    });
-  }, [autoExpanded]);
+
 
   useEffect(() => {
     setDynamicCollections(collections);
@@ -233,50 +278,72 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
   const [isWizardOpen, setIsWizardOpen] = useState(false);
 
   return (
-    <ErrorBoundary fallback={<div className="p-4 text-xs text-red-500 bg-red-950/20 rounded m-4 border border-red-900/50">侧边栏组件渲染异常，请尝试刷新页面或联系技术支持。</div>}>
-      <div className="w-64 h-full bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800">
-        <div className="p-6 border-b border-slate-800">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-xs text-white">Y</div>
-            YCZ.ME
-          </h2>
-          <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider">专业独立站构建平台</p>
+    <ErrorBoundary fallback={<div className="p-4 text-xs text-red-500 bg-red-950/20 rounded m-4 border border-red-900/50">侧边栏组件渲染异常</div>}>
+      <div className={`transition-all duration-300 ease-in-out flex flex-col border-r border-slate-800 h-screen bg-slate-900 text-slate-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
+        
+        {/* Header Section */}
+        <div className={`p-6 border-b border-slate-800 flex items-center ${isCollapsed ? 'justify-center px-0' : 'justify-between'}`}>
+          {!isCollapsed && (
+            <div className="flex flex-col">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-xs text-white">Y</div>
+                YCZ.ME
+              </h2>
+              <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider">独立站平台</p>
+            </div>
+          )}
+          
+          <button 
+            onClick={() => {
+              setIsCollapsed(!isCollapsed);
+              setActiveFlyout(null);
+            }}
+            className={`p-2 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 hover:text-white ${isCollapsed ? '' : 'ml-2'}`}
+          >
+            {isCollapsed ? <LucideIcons.PanelLeftOpen size={18} /> : <LucideIcons.PanelLeftClose size={18} />}
+          </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto mt-4">
+        {/* Navigation */}
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto mt-2 overflow-x-hidden relative">
           <RecursiveMenu 
             items={MENU_ITEMS} 
             permissions={permissions} 
             currentPath={currentPath} 
             expandedMenus={expandedMenus}
             onToggle={handleSidebarMenuToggle}
+            isCollapsed={isCollapsed}
           />
         </nav>
 
+        {/* Wizard Button */}
         {hasPermission(permissions, 'site.init') && (
-          <div className="px-4 mb-4">
+          <div className={`px-4 mb-4 transition-all duration-300 ${isCollapsed ? 'px-2' : ''}`}>
             <button
               onClick={() => setIsWizardOpen(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl shadow-lg shadow-blue-900/40 transition-all duration-300 group"
+              title="初始化站点"
+              className={`flex items-center justify-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl shadow-lg transition-all duration-300 group ${isCollapsed ? 'w-12 h-12 p-0 mx-auto' : 'w-full px-4 py-3 gap-2'}`}
             >
               <Wand2 size={16} className="group-hover:rotate-12 transition-transform" />
-              <span className="text-sm font-semibold">初始化站点</span>
+              {!isCollapsed && <span className="text-sm font-semibold">初始化站点</span>}
             </button>
           </div>
         )}
 
-        <div className="p-4 border-t border-slate-800 bg-slate-900/50">
-          <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">
+        {/* User Info */}
+        <div className={`p-4 border-t border-slate-800 bg-slate-900/50 transition-all duration-300 ${isCollapsed ? 'px-0' : ''}`}>
+          <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : 'px-2'}`}>
+            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-inner">
               {username?.[0].toUpperCase() || 'A'}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-white truncate">{username || 'Administrator'}</p>
-              <p className="text-[10px] text-slate-500 capitalize">
-                {permissions.includes('all') ? 'Super Admin' : 'Manager'}
-              </p>
-            </div>
+            {!isCollapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-white truncate">{username || 'Administrator'}</p>
+                <p className="text-[10px] text-slate-500 capitalize">
+                  {permissions.includes('all') ? 'Super Admin' : 'Manager'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -284,6 +351,34 @@ export const Sidebar: React.FC<SidebarProps> = ({ permissions, currentPath, user
           isOpen={isWizardOpen}
           onClose={() => setIsWizardOpen(false)}
         />
+
+        {/* Flyout Submenu for Collapsed Mode */}
+        {isCollapsed && activeFlyout && (
+          <div 
+            className="fixed left-[80px] z-[999] bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-2 min-w-[200px] animate-in slide-in-from-left-2 duration-200"
+            style={{ top: Math.min(activeFlyout.top, window.innerHeight - 300) }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="px-3 py-2 border-b border-slate-700/50 mb-1">
+              <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">{activeFlyout.title}</span>
+            </div>
+            <div className="space-y-1">
+              {activeFlyout.items.map((sub, i) => (
+                <a
+                  key={i}
+                  href={sub.href}
+                  onClick={() => setActiveFlyout(null)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
+                    currentPath === sub.href ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                  }`}
+                >
+                  <sub.icon size={14} />
+                  <span>{sub.title}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </ErrorBoundary>
   );
@@ -294,9 +389,10 @@ const RecursiveMenu: React.FC<{
   permissions: string[];
   currentPath: string;
   expandedMenus: string[];
-  onToggle: (title: string) => void;
+  onToggle: (title: string, subItems?: any[], rect?: DOMRect) => void;
+  isCollapsed?: boolean;
   level?: number;
-}> = ({ items, permissions, currentPath, expandedMenus, onToggle, level = 0 }) => {
+}> = ({ items, permissions, currentPath, expandedMenus, onToggle, isCollapsed = false, level = 0 }) => {
   const hasActiveChild = (item: any): boolean => {
     if (item.href && currentPath === item.href) return true;
     if (item.subItems) {
@@ -311,7 +407,7 @@ const RecursiveMenu: React.FC<{
         if (!hasPermission(permissions, item.requiredPermission)) return null;
 
         const hasSubItems = item.subItems && item.subItems.length > 0;
-        const isExpanded = expandedMenus.includes(item.title);
+        const isExpanded = expandedMenus.includes(item.title) && !isCollapsed;
         const isParentActive = hasSubItems && item.subItems.some((sub: any) => hasActiveChild(sub));
         const isActive = item.href && currentPath === item.href;
 
@@ -320,45 +416,49 @@ const RecursiveMenu: React.FC<{
             {hasSubItems ? (
               <button
                 type="button"
-                onClick={() => onToggle(item.title)}
-                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg transition-all duration-200 group ${
+                onClick={(e) => onToggle(item.title, item.subItems, e.currentTarget.getBoundingClientRect())}
+                title={isCollapsed ? item.title : undefined}
+                className={`w-full flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group ${
                   isParentActive ? 'bg-slate-800/50 text-white' : 'hover:bg-slate-800 hover:text-white'
-                } ${level > 0 ? 'ml-2 pr-2' : ''}`}
+                } ${level > 0 ? 'ml-2 pr-2' : ''} ${isCollapsed ? 'justify-center' : 'justify-between'}`}
               >
-                <div className="flex items-center gap-3">
+                <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
                   {level === 0 ? (
                     <item.icon size={18} className={isParentActive ? 'text-blue-400' : 'text-slate-400 group-hover:text-blue-400'} />
                   ) : (
-                    <div className={`w-1.5 h-1.5 rounded-full ${isParentActive ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]' : 'bg-slate-600 group-hover:bg-blue-400'} transition-all`} />
+                    !isCollapsed && <div className={`w-1.5 h-1.5 rounded-full ${isParentActive ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]' : 'bg-slate-600 group-hover:bg-blue-400'} transition-all`} />
                   )}
-                  <span className={`${level === 0 ? 'font-medium' : 'text-xs'} truncate`}>{item.title}</span>
+                  {!isCollapsed && <span className={`${level === 0 ? 'font-medium' : 'text-xs'} truncate`}>{item.title}</span>}
                 </div>
-                <ChevronRight
-                  size={14}
-                  className={`transition-transform duration-200 ${isExpanded ? 'rotate-90 text-blue-400' : 'text-slate-50'}`}
-                />
+                {!isCollapsed && (
+                  <ChevronRight
+                    size={14}
+                    className={`transition-transform duration-200 ${isExpanded ? 'rotate-90 text-blue-400' : 'text-slate-50'}`}
+                  />
+                )}
               </button>
             ) : (
               <a
                 href={item.href}
-                className={`flex items-center justify-between px-4 py-2.5 rounded-lg transition-all duration-200 group ${
+                title={isCollapsed ? item.title : undefined}
+                className={`flex items-center px-4 py-2.5 rounded-lg transition-all duration-200 group ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
                     : 'hover:bg-slate-800 hover:text-white'
-                } ${level > 0 ? 'ml-2 pr-2' : ''}`}
+                } ${level > 0 ? 'ml-2 pr-2' : ''} ${isCollapsed ? 'justify-center' : 'justify-between'}`}
               >
-                <div className="flex items-center gap-3">
+                <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
                   {level === 0 ? (
                     <item.icon size={18} className={isActive ? 'text-white' : 'text-slate-400 group-hover:text-blue-400'} />
                   ) : (
-                    <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'bg-slate-700'} group-hover:bg-blue-400 transition-all`} />
+                    !isCollapsed && <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'bg-slate-700'} group-hover:bg-blue-400 transition-all`} />
                   )}
-                  <span className={`${level === 0 ? 'font-medium' : 'text-xs'} truncate`}>{item.title}</span>
+                  {!isCollapsed && <span className={`${level === 0 ? 'font-medium' : 'text-xs'} truncate`}>{item.title}</span>}
                 </div>
               </a>
             )}
 
-            {hasSubItems && isExpanded && (
+            {hasSubItems && isExpanded && !isCollapsed && (
               <div className={`border-l border-slate-800 space-y-1 mt-1 ${level === 0 ? 'ml-4' : 'ml-4'}`}>
                 <RecursiveMenu 
                   items={item.subItems} 
@@ -366,6 +466,7 @@ const RecursiveMenu: React.FC<{
                   currentPath={currentPath} 
                   expandedMenus={expandedMenus} 
                   onToggle={onToggle}
+                  isCollapsed={isCollapsed}
                   level={level + 1}
                 />
               </div>
