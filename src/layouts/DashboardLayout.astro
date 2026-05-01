@@ -79,13 +79,31 @@ const allCollections = await db.select().from(collectionsTable).all().catch(() =
           </a>
         )}
 
-        <form action="/api/auth/admin/logout" method="POST">
-             <button type="submit" class="text-sm font-medium text-slate-600 hover:text-red-600 transition-colors">
-               退出登录
-             </button>
-        </form>
+        <button 
+          id="logout-btn"
+          class="text-sm font-medium text-slate-600 hover:text-red-600 transition-colors cursor-pointer"
+        >
+          退出登录
+        </button>
       </div>
     </header>
+
+    <script>
+      const logoutBtn = document.getElementById('logout-btn');
+      logoutBtn?.addEventListener('click', async () => {
+        try {
+          const res = await fetch('/api/auth/admin/logout', { method: 'POST' });
+          if (res.ok) {
+            window.location.href = '/login';
+          } else {
+            alert('退出登录失败，请稍后重试');
+          }
+        } catch (e) {
+          console.error('Logout error:', e);
+          window.location.href = '/login'; // 报错也强制跳转到登录页
+        }
+      });
+    </script>
 
     <!-- 动态内容渲染区 -->
     <main class="flex-1 overflow-y-auto p-8 relative">
