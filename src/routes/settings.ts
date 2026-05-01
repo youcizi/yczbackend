@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { createDbClient } from '../db';
 import { systemSettings, languages } from '../db/schema';
-import { requirePermission } from '../lib/rbac';
+import { requirePermission } from '../middleware/rbac';
 
 const settingsRoutes = new Hono<{ Bindings: any }>();
 

@@ -51,17 +51,7 @@ auth.post('/admin/login', async (c) => {
   }
 
   // 2. 校验密码
-  let validPassword = await passwordHasher.verify(existingAdmin.passwordHash, password);
-  
-  // 2.1 E2E/Dev 暴力自愈
-  if (!validPassword && c.env.NODE_ENV === 'development') {
-    const newHashedPassword = await passwordHasher.hash(password);
-    await db.update(schema.users)
-      .set({ passwordHash: newHashedPassword })
-      .where(eq(schema.users.id, existingAdmin.id))
-      .run();
-    validPassword = true;
-  }
+  const validPassword = await passwordHasher.verify(existingAdmin.passwordHash, password);
 
   if (!validPassword) {
     return c.json({ error: '用户名或密码错误' }, 401);
@@ -74,6 +64,7 @@ auth.post('/admin/login', async (c) => {
 
   return c.json({ message: '登录成功' });
 });
+
 
 /**
  * 管理员登出接口

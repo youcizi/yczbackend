@@ -89,7 +89,78 @@ users.delete('/:id', requirePermission('user.delete'), async (c) => {
   const id = c.req.param('id');
   const db = await createDbClient(c.env.DB);
   try {
-    await db.delete(schema.users).where(eq(schema.users.id, id)).run();
+    // 强制级联清理 (手动模式，以防 D1 环境下外键级联失效)
+    const batchQueries = [
+      db.delete(schema.apiTokens).where(eq(schema.apiTokens.userId, id)),
+      db.delete(schema.memberSessions).where(eq(schema.memberSessions.userId, id)),
+      db.delete(schema.adminSessions).where(eq(schema.adminSessions.userId, id)),
+      db.delete(schema.members).where(eq(schema.members.id, id)),
+      db.delete(schema.admins).where(eq(schema.admins.id, id)),
+      db.delete(schema.users).where(eq(schema.users.id, id))
+    ];
+    
+    await db.batch(batchQueries as any);
+    return c.json({ success: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+/**
+ * [API Management] 获取所有 API 令牌
+ */
+users.get('/tokens/all', requirePermission('user.api_manage'), async (c) => {
+  const db = await createDbClient(c.env.DB);
+  const tokens = await db.select({
+    id: schema.apiTokens.id,
+    userId: schema.apiTokens.userId,
+    email: schema.users.email,
+    name: schema.apiTokens.name,
+    token: schema.apiTokens.token,
+    status: schema.apiTokens.status,
+    lastUsedAt: schema.apiTokens.lastUsedAt,
+    createdAt: schema.apiTokens.createdAt
+  })
+  .from(schema.apiTokens)
+  .innerJoin(schema.users, eq(schema.apiTokens.userId, schema.users.id))
+  .all();
+  
+  return c.json({ success: true, data: tokens });
+});
+
+/**
+ * [API Management] 为用户颁发新令牌
+ */
+users.post('/:id/tokens', requirePermission('user.api_manage'), async (c) => {
+  const userId = c.req.param('id');
+  const { name } = await c.req.json();
+  const db = await createDbClient(c.env.DB);
+  
+  const tokenValue = 'at_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  
+  try {
+    await db.insert(schema.apiTokens).values({
+      userId,
+      name: name || 'Default Token',
+      token: tokenValue,
+      status: 'active'
+    }).run();
+    
+    return c.json({ success: true, token: tokenValue });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+/**
+ * [API Management] 撤销令牌
+ */
+users.delete('/tokens/:tokenId', requirePermission('user.api_manage'), async (c) => {
+  const tokenId = c.req.param('tokenId');
+  const db = await createDbClient(c.env.DB);
+  
+  try {
+    await db.delete(schema.apiTokens).where(eq(schema.apiTokens.id, parseInt(tokenId))).run();
     return c.json({ success: true });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);

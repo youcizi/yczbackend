@@ -3,6 +3,7 @@ import { users } from './schema/users';
 export * from './schema/users';
 export * from './schema/members';
 export * from './schema/inquiries';
+export * from './schema/api_tokens';
 
 // ============================================================================
 // [PLUGIN SCHEMAS] - 插件专属 Schema 挂载点 (由脚本自动生成，请勿手动修改)
@@ -105,7 +106,7 @@ export const admins = sqliteTable('admins', {
  */
 export const adminSessions = sqliteTable('admin_sessions', {
   id: text('id').primaryKey(),
-  userId: text('user_id').notNull().references(() => admins.id),
+  userId: text('user_id').notNull().references(() => admins.id, { onDelete: 'cascade' }),
   expiresAt: integer('expires_at').notNull(),
 });
 
@@ -114,7 +115,7 @@ export const adminSessions = sqliteTable('admin_sessions', {
  */
 export const memberSessions = sqliteTable('member_sessions', {
   id: text('id').primaryKey(),
-  userId: text('user_id').notNull().references(() => members.id),
+  userId: text('user_id').notNull().references(() => members.id, { onDelete: 'cascade' }),
   expiresAt: integer('expires_at').notNull(),
 });
 

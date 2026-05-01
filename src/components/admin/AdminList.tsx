@@ -49,6 +49,12 @@ export const AdminList: React.FC<UserListProps> = ({
   const [isLevelConfigOpen, setIsLevelConfigOpen] = useState(false);
   const [tempLevels, setTempLevels] = useState<{level: number, name: string}[]>([]);
 
+  // API 令牌管理相关
+  const [apiTokens, setApiTokens] = useState<any[]>([]);
+  const [isIssueTokenOpen, setIsIssueTokenOpen] = useState(false);
+  const [issueData, setIssueData] = useState({ userId: '', name: '' });
+  const [newlyIssuedToken, setNewlyIssuedToken] = useState<string | null>(null);
+
   // 表单状态
   const [formData, setFormData] = useState({
     email: '',
@@ -71,9 +77,25 @@ export const AdminList: React.FC<UserListProps> = ({
     }
   };
 
+  // 获取 API 令牌
+  const fetchApiTokens = async () => {
+    try {
+      const res = await fetch('/api/v1/users/tokens/all');
+      const result = await res.json();
+      if (result.success) {
+        setApiTokens(result.data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch API tokens');
+    }
+  };
+
   useEffect(() => {
     fetchLevelConfigs();
-  }, []);
+    if (activeTab === 'api') {
+      fetchApiTokens();
+    }
+  }, [activeTab]);
 
   const saveLevelConfigs = async () => {
     setIsLoading(true);
@@ -91,6 +113,40 @@ export const AdminList: React.FC<UserListProps> = ({
       setError('保存等级配置失败');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleIssueToken = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/v1/users/${issueData.userId}/tokens`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: issueData.name })
+      });
+      const result = await res.json();
+      if (result.success) {
+        setNewlyIssuedToken(result.token);
+        fetchApiTokens();
+      }
+    } catch (e) {
+      setError('颁发令牌失败');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRevokeToken = async (tokenId: number) => {
+    if (!confirm('确定要撤销此 API 令牌吗？该操作不可撤销且将立即导致对应应用无法访问。')) return;
+    
+    try {
+      const res = await fetch(`/api/v1/users/tokens/${tokenId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setApiTokens(apiTokens.filter(t => t.id !== tokenId));
+      }
+    } catch (e) {
+      setError('撤销令牌失败');
     }
   };
 
@@ -187,18 +243,33 @@ export const AdminList: React.FC<UserListProps> = ({
             </TabsList>
 
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setIsLevelConfigOpen(true)}
-                className="border-slate-200 text-slate-600 hover:bg-slate-50"
-              >
-                <Settings className="w-4 h-4 mr-2" />
-                等级配置
-              </Button>
               {activeTab === 'list' && (
-                <Button onClick={openAddDialog} className="bg-blue-600 hover:bg-blue-700 text-white shadow-md">
-                  <Plus className="w-4 h-4 mr-2" />
-                  添加新用户
+                <>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsLevelConfigOpen(true)}
+                    className="border-slate-200 text-slate-600 hover:bg-slate-50"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    等级配置
+                  </Button>
+                  <Button onClick={openAddDialog} className="bg-blue-600 hover:bg-blue-700 text-white shadow-md">
+                    <Plus className="w-4 h-4 mr-2" />
+                    添加新用户
+                  </Button>
+                </>
+              )}
+              {activeTab === 'api' && (
+                <Button 
+                  onClick={() => {
+                    setNewlyIssuedToken(null);
+                    setIssueData({ userId: users[0]?.id || '', name: '' });
+                    setIsIssueTokenOpen(true);
+                  }} 
+                  className="bg-slate-900 hover:bg-slate-800 text-white shadow-md"
+                >
+                  <Key className="w-4 h-4 mr-2" />
+                  颁发 API 令牌
                 </Button>
               )}
             </div>
@@ -293,37 +364,118 @@ export const AdminList: React.FC<UserListProps> = ({
             </div>
           </TabsContent>
 
-          <TabsContent value="api" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="bg-white rounded-xl border border-slate-200 p-8 text-center shadow-sm">
-              <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Key className="w-8 h-8" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-900">用户 API 访问管理</h3>
-              <p className="text-slate-500 mt-2 max-w-md mx-auto">
-                在这里可以为用户分配 API 密钥，设置访问频率限制，以及监控接口调用日志。
-              </p>
-              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-left">
-                  <div className="font-bold text-slate-900 flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-blue-500" />
-                    访问令牌控制
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">管理用户用于 REST API 的长效或临时令牌。</p>
-                </div>
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-left">
-                  <div className="font-bold text-slate-900 flex items-center gap-2">
-                    <Database className="w-4 h-4 text-emerald-500" />
-                    调用额度统计
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">监控各用户对各插件 API 的调用次数与流量。</p>
-                </div>
-              </div>
-              <Button className="mt-8 bg-slate-900 hover:bg-slate-800">
-                配置全局 API 策略
-              </Button>
+          <TabsContent value="api" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="user-list-wrapper w-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <table className="w-full border-collapse text-left text-sm text-slate-600">
+                <thead className="bg-slate-50/80 border-b border-slate-200">
+                  <tr>
+                    <th className="px-6 py-4 font-semibold text-slate-900">所有者 (Email)</th>
+                    <th className="px-6 py-4 font-semibold text-slate-900">令牌名称</th>
+                    <th className="px-6 py-4 font-semibold text-slate-900">令牌摘要 (Token)</th>
+                    <th className="px-6 py-4 font-semibold text-slate-900">状态</th>
+                    <th className="px-6 py-4 font-semibold text-slate-900">最后使用</th>
+                    <th className="px-6 py-4 font-semibold text-slate-900 text-right">管理操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {apiTokens.length > 0 ? (
+                    apiTokens.map((token) => (
+                      <tr key={token.id} className="hover:bg-slate-50/50 transition-colors group">
+                        <td className="px-6 py-4 font-medium text-slate-900">{token.email}</td>
+                        <td className="px-6 py-4 text-slate-600">{token.name}</td>
+                        <td className="px-6 py-4 font-mono text-xs text-slate-400">
+                          {token.token.substring(0, 8)}...{token.token.substring(token.token.length - 4)}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                            token.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
+                          }`}>
+                            {token.status === 'active' ? '活跃' : '已撤销'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-slate-400 text-xs">
+                          {token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleString() : '从未使用'}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button 
+                            onClick={() => handleRevokeToken(token.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                            title="撤销令牌"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                        目前暂无已颁发的 API 令牌
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* 颁发 API 令牌弹窗 */}
+        <Dialog open={isIssueTokenOpen} onOpenChange={setIsIssueTokenOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>颁发 API 访问令牌</DialogTitle>
+              <DialogDescription>
+                为指定会员颁发用于 REST API 调用的长效身份凭证。
+              </DialogDescription>
+            </DialogHeader>
+            
+            {newlyIssuedToken ? (
+              <div className="space-y-4 py-4 animate-in zoom-in-95 duration-300">
+                <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
+                  <Label className="text-emerald-800 font-bold mb-2 block">令牌已成功生成！</Label>
+                  <p className="text-xs text-emerald-600 mb-4">请务必立即复制并保存此令牌，关闭此窗口后将无法再次查看。</p>
+                  <div className="bg-white p-3 rounded border border-emerald-200 font-mono text-sm break-all select-all cursor-pointer" title="点击全选复制">
+                    {newlyIssuedToken}
+                  </div>
+                </div>
+                <Button onClick={() => setIsIssueTokenOpen(false)} className="w-full">
+                  我已保存，关闭窗口
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleIssueToken} className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="issueUser">选择目标会员</Label>
+                  <Select 
+                    value={issueData.userId} 
+                    onValueChange={(val) => setIssueData({ ...issueData, userId: val })}
+                  >
+                    {users.map(u => (
+                      <SelectItem key={u.id} value={u.id}>{u.email}</SelectItem>
+                    ))}
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="issueName">令牌用途/名称</Label>
+                  <Input 
+                    id="issueName"
+                    value={issueData.name}
+                    onChange={(e) => setIssueData({ ...issueData, name: e.target.value })}
+                    placeholder="例如：移动端专用、测试密钥"
+                    required
+                  />
+                </div>
+                <DialogFooter className="pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsIssueTokenOpen(false)}>取消</Button>
+                  <Button type="submit" loading={isLoading} className="bg-slate-900 hover:bg-slate-800">
+                    立即颁发
+                  </Button>
+                </DialogFooter>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* 会员等级配置弹窗 */}
         <Dialog open={isLevelConfigOpen} onOpenChange={setIsLevelConfigOpen}>

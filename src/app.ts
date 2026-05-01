@@ -134,17 +134,25 @@ function createAdminApp() {
   admin.use('*', domainDispatcher);
 
   // 2. 会话管理 (Session Hygiene)
-  admin.use('/*', async (c, next) => {
+  admin.use('*', async (c, next) => {
     // 排除权限校验: 登录、公开入口、消费端 API
-    if (c.req.path.includes('/auth/admin/login') ||
-      c.req.path.includes('/auth/seed') ||
-      c.req.path.includes('/v1/p/') ||
-      c.req.path.includes('/v1/s/')
+    const path = c.req.path;
+    if (path.includes('/auth/admin/login') ||
+      path.includes('/auth/seed') ||
+      path.includes('/v1/p/') ||
+      path.includes('/v1/s/')
     ) return await next();
 
     try {
       const { adminAuth } = await getAuthInstances(c.env.DB);
-      const sessionId = adminAuth.readSessionCookie(c.req.header('Cookie') ?? '');
+      const cookieHeader = c.req.header('Cookie') ?? '';
+      let sessionId = adminAuth.readSessionCookie(cookieHeader);
+
+      // [Fallback] 针对某些 Hono/Vite 环境下 Cookie 解析异常的补全
+      if (!sessionId && cookieHeader.includes('admin_session=')) {
+        const match = cookieHeader.match(/admin_session=([^;]+)/);
+        if (match) sessionId = match[1];
+      }
 
       if (!sessionId) {
         c.set('user', null);
@@ -159,14 +167,16 @@ function createAdminApp() {
       }
 
       if (!session) {
-        // 会话失效，强制清理浏览器 Cookie
         c.header('Set-Cookie', adminAuth.createBlankSessionCookie().serialize(), { append: true });
       }
 
       c.set('user', user);
       c.set('session', session as any);
       await next();
-    } catch (e) { await next(); }
+    } catch (e) { 
+      console.error('❌ [Admin Session Middleware] Error:', e);
+      await next(); 
+    }
   });
 
   // 3. 开发工具：Seed 种子路由 (Restore)
