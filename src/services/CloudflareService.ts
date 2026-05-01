@@ -144,6 +144,73 @@ export class CloudflareService {
   }
 
   /**
+   * 确保 KV 命名空间存在
+   */
+  static async ensureKvNamespace(env: { CF_ACCOUNT_ID: string, CF_API_TOKEN: string }, title: string): Promise<string> {
+    const listUrl = `${this.CF_API_BASE}/accounts/${env.CF_ACCOUNT_ID}/storage/kv/namespaces`;
+    const listRes = await fetch(listUrl, {
+      headers: { 'Authorization': `Bearer ${env.CF_API_TOKEN}` }
+    });
+    const listData = await listRes.json() as any;
+    
+    if (listData.success) {
+      const existing = listData.result.find((ns: any) => ns.title === title || ns.title === `backend-${title}`);
+      if (existing) return existing.id;
+    }
+
+    // 创建新的
+    const createUrl = `${this.CF_API_BASE}/accounts/${env.CF_ACCOUNT_ID}/storage/kv/namespaces`;
+    const createRes = await fetch(createUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${env.CF_API_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ title: `backend-${title}` })
+    });
+
+    if (!createRes.ok) await this.handleApiError(createRes, `KV Namespace ${title} 创建失败`);
+    const createData = await createRes.json() as any;
+    return createData.result.id;
+  }
+
+  /**
+   * 确保 Turnstile Widget 存在
+   */
+  static async ensureTurnstileWidget(env: { CF_ACCOUNT_ID: string, CF_API_TOKEN: string }, name: string, domain: string): Promise<{ siteKey: string, secretKey: string }> {
+    const url = `${this.CF_API_BASE}/accounts/${env.CF_ACCOUNT_ID}/challenges/widgets`;
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${env.CF_API_TOKEN}` }
+    });
+    const data = await res.json() as any;
+
+    if (data.success) {
+      const existing = data.result.find((w: any) => w.name === name);
+      if (existing) {
+        return { siteKey: existing.sitekey, secretKey: existing.secret };
+      }
+    }
+
+    // 创建新的
+    const createRes = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${env.CF_API_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: name,
+        domains: [this.extractRootDomain(domain)],
+        mode: 'managed'
+      })
+    });
+
+    if (!createRes.ok) await this.handleApiError(createRes, 'Turnstile Widget 创建失败');
+    const createData = await createRes.json() as any;
+    return { siteKey: createData.result.sitekey, secretKey: createData.result.secret };
+  }
+
+  /**
    * 辅助：提取根域名
    */
   private static extractRootDomain(hostname: string): string {
@@ -162,7 +229,7 @@ export class CloudflareService {
 
     if (res.status === 403) {
       const detail = messages.join(' ') || errors.map((e: any) => e.message).join(' ');
-      throw new Error(`🔐 [CF 权限不足] ${context}: 请确保 Token 拥有 Zone.DNS:Edit 和 Workers Routes:Edit 权限。 详情: ${detail}`);
+      throw new Error(`🔐 [CF 权限不足] ${context}: 请确保 Token 拥有 Zone.DNS:Edit, Workers Routes:Edit 和 KV Storage:Edit, Turnstile:Edit 权限。 详情: ${detail}`);
     }
 
     throw new Error(`❌ [CF API 错误] ${context} (${res.status}): ${JSON.stringify(errors)}`);

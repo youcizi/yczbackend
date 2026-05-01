@@ -1,18 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { memberApi } from '../lib/api';
 
 export const Login: React.FC<{ onNavigate: (p: any) => void, onLoginSuccess: () => void }> = ({ onNavigate, onLoginSuccess }) => {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const turnstileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const siteKey = (window as any).TURNSTILE_SITE_KEY;
+    if (!siteKey) {
+      console.warn('⚠️ [Turnstile] Site key is missing.');
+      return;
+    }
+
+    // @ts-ignore
+    if (window.turnstile) {
+      // @ts-ignore
+      window.turnstile.render(turnstileRef.current, {
+        sitekey: siteKey,
+        callback: (token: string) => {
+          setTurnstileToken(token);
+        },
+      });
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!turnstileToken) {
+      return setError('请完成人机验证');
+    }
+
     setLoading(true);
     setError('');
     try {
-      const res = await memberApi.login(formData);
-      if (res.error) throw new Error(res.error);
+      const res = await memberApi.login({ ...formData, cfToken: turnstileToken });
+      if (res.error) {
+        // 失败后重置验证码
+        // @ts-ignore
+        if (window.turnstile) window.turnstile.reset();
+        setTurnstileToken('');
+        throw new Error(res.error);
+      }
       onLoginSuccess();
     } catch (err: any) {
       setError(err.message);
@@ -65,6 +96,8 @@ export const Login: React.FC<{ onNavigate: (p: any) => void, onLoginSuccess: () 
               />
             </div>
           </div>
+
+          <div className="flex justify-center" ref={turnstileRef}></div>
 
           <button
             type="submit"

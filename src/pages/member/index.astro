@@ -1,6 +1,10 @@
 ---
 import { App } from '../../member-app/App';
+// @ts-ignore
+import { env } from 'cloudflare:workers';
 const title = "会员中心 - 参考实现";
+
+const siteKey = env?.TURNSTILE_SITE_KEY || "";
 ---
 
 <!doctype html>
@@ -11,6 +15,12 @@ const title = "会员中心 - 参考实现";
     <meta name="viewport" content="width=device-width" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
+    
+    <script is:inline define:vars={{ siteKey }}>
+      window.TURNSTILE_SITE_KEY = siteKey;
+    </script>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+
     <style is:global>
       :root {
         --accent: 136, 58, 234;

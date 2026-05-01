@@ -103,14 +103,31 @@ auth.get('/admin/me', async (c) => {
  * 会员登录接口 (Member Auth)
  */
 auth.post('/member/login', async (c) => {
-  const { email, password } = await c.req.json();
+  const { email, password, cfToken } = await c.req.json();
+  const { RateLimitService } = await import('../services/RateLimitService');
+  const { TurnstileService } = await import('../services/TurnstileService');
+
+  // 1. 频率限制 (基于 Email) - 5分钟内最多 5 次尝试
+  const rl = await RateLimitService.checkRateLimit(c.env.RATE_LIMITER, `login:${email}`, 5, 300);
+  if (!rl.success) {
+    return c.json({ error: '登录尝试过于频繁，请稍后再试' }, 429);
+  }
+
+  // 2. 人机验证
+  if (c.env.TURNSTILE_SECRET_KEY) {
+    const isHuman = await TurnstileService.verifyToken(c.env.TURNSTILE_SECRET_KEY, cfToken);
+    if (!isHuman) {
+      return c.json({ error: '安全验证失败，请重新尝试' }, 403);
+    }
+  }
+
   const { userAuth } = await getAuthInstances(c.env.DB);
   const db = await createDbClient(c.env.DB);
   
   const domains = c.get('site_domains' as any) || c.get('domains' as any);
   let tenantId = domains?.tenant_id || domains?.id || 1; 
 
-  // 1. 联合查询：通过 Email 和 TenantId 在 Users 表定位，并关联 Members 表
+  // 3. 联合查询
   const result = await db.select({
     id: schema.users.id,
     passwordHash: schema.users.passwordHash,
@@ -130,13 +147,16 @@ auth.post('/member/login', async (c) => {
     return c.json({ error: '邮箱或密码错误' }, 401);
   }
 
-  // 2. 校验密码
+  // 4. 校验密码
   const validPassword = await passwordHasher.verify(result.passwordHash, password);
   if (!validPassword) {
     return c.json({ error: '邮箱或密码错误' }, 401);
   }
 
-  // 3. 创建会话
+  // 5. 登录成功，重置频率限制
+  await RateLimitService.resetRateLimit(c.env.RATE_LIMITER, `login:${email}`);
+
+  // 6. 创建会话
   const session = await userAuth.createSession(result.id, {});
   const sessionCookie = userAuth.createSessionCookie(session.id);
   c.header('Set-Cookie', sessionCookie.serialize(), { append: true });
