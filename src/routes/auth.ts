@@ -10,11 +10,34 @@ const auth = new Hono<{ Bindings: any }>();
  * 管理员登录接口
  */
 auth.post('/admin/login', async (c) => {
-  const { username, password } = await c.req.json();
+  const { username, password, cfToken } = await c.req.json();
+  const { RateLimitService } = await import('../services/RateLimitService');
+  const { TurnstileService } = await import('../services/TurnstileService');
+
+  // 1. 频率限制 (基于 Username)
+  // 开发环境 (NODE_ENV === 'development') 自动跳过限制，方便调试
+  if (c.env.NODE_ENV !== 'development') {
+    const rl = await RateLimitService.checkRateLimit(c.env.RATE_LIMITER, `admin_login:${username}`, 5, 300);
+    if (!rl.success) {
+      return c.json({ error: '登录尝试过于频繁，请稍后再试' }, 429);
+    }
+  }
+
+  // 2. 人机验证
+  // 仅在生产环境或配置了 SecretKey 且非开发模式下进行校验
+  if (c.env.NODE_ENV !== 'development' && c.env.TURNSTILE_ADMIN_SECRET_KEY) {
+    const isHuman = await TurnstileService.verifyToken(c.env.TURNSTILE_ADMIN_SECRET_KEY, cfToken);
+    if (!isHuman) {
+      return c.json({ error: '安全验证失败，请重新尝试' }, 403);
+    }
+  } else if (c.env.NODE_ENV === 'development') {
+    console.log('🧪 [Auth] 开发模式：已跳过 Turnstile 校验');
+  }
+
   const { adminAuth } = await getAuthInstances(c.env.DB);
   const db = await createDbClient(c.env.DB);
 
-  // 1. 联合查询：从 admins 表找到用户，并从 users 表获取哈希密码
+  // 3. 联合查询
   let existingAdmin = await db.select({
     id: schema.admins.id,
     username: schema.admins.username,
@@ -26,13 +49,11 @@ auth.post('/admin/login', async (c) => {
   .where(eq(schema.admins.username, username))
   .get();
 
-  // 1.1 物理数据自愈：如果数据库为空，则触发种子回填
+  // 3.1 物理数据自愈
   if (!existingAdmin) {
     const adminCount = await db.select({ count: sql<number>`count(*)` }).from(schema.admins).get();
     if (!adminCount || adminCount.count === 0) {
-      console.log('🌱 [Auth] 检测到数据库空白，正在执行自动种子初始化...');
       await seedAdmin(c.env.DB);
-      // 重新查询
       existingAdmin = await db.select({
         id: schema.admins.id,
         username: schema.admins.username,
@@ -47,17 +68,19 @@ auth.post('/admin/login', async (c) => {
   }
 
   if (!existingAdmin || existingAdmin.status !== 'active') {
-    return c.json({ error: '用户名或密码错误或账号已禁用' }, 401);
+    return c.json({ error: '用户名或密码错误' }, 401);
   }
 
-  // 2. 校验密码
+  // 4. 校验密码
   const validPassword = await passwordHasher.verify(existingAdmin.passwordHash, password);
-
   if (!validPassword) {
     return c.json({ error: '用户名或密码错误' }, 401);
   }
 
-  // 3. 创建会话
+  // 5. 登录成功，重置频率限制
+  await RateLimitService.resetRateLimit(c.env.RATE_LIMITER, `admin_login:${username}`);
+
+  // 6. 创建会话
   const session = await adminAuth.createSession(existingAdmin.id, {});
   const sessionCookie = adminAuth.createSessionCookie(session.id);
   c.header('Set-Cookie', sessionCookie.serialize(), { append: true });
@@ -107,22 +130,22 @@ auth.post('/member/login', async (c) => {
   const { RateLimitService } = await import('../services/RateLimitService');
   const { TurnstileService } = await import('../services/TurnstileService');
 
-  // 1. 频率限制 (基于 Email) - 5分钟内最多 5 次尝试
-  const rl = await RateLimitService.checkRateLimit(c.env.RATE_LIMITER, `login:${email}`, 5, 300);
-  if (!rl.success) {
-    return c.json({ error: '登录尝试过于频繁，请稍后再试' }, 429);
+  // 1. 频率限制 (基于 Email)
+  if (c.env.NODE_ENV !== 'development') {
+    const rl = await RateLimitService.checkRateLimit(c.env.RATE_LIMITER, `login:${email}`, 5, 300);
+    if (!rl.success) {
+      return c.json({ error: '登录尝试过于频繁，请稍后再试' }, 429);
+    }
   }
 
   // 2. 人机验证
-  if (c.env.TURNSTILE_SECRET_KEY) {
-    // 开发环境降级处理：如果是测试 Key 或者是 localhost 环境，使用测试 Secret
-    const isLocal = c.req.header('host')?.includes('localhost') || c.req.header('host')?.includes('127.0.0.1');
-    const secret = isLocal ? "1x00000000000000000000000000000000" : c.env.TURNSTILE_SECRET_KEY;
-    
-    const isHuman = await TurnstileService.verifyToken(secret, cfToken);
+  if (c.env.NODE_ENV !== 'development' && c.env.TURNSTILE_SECRET_KEY) {
+    const isHuman = await TurnstileService.verifyToken(c.env.TURNSTILE_SECRET_KEY, cfToken);
     if (!isHuman) {
       return c.json({ error: '安全验证失败，请重新尝试' }, 403);
     }
+  } else if (c.env.NODE_ENV === 'development') {
+    console.log('🧪 [Auth] 会员登录-开发模式：已跳过 Turnstile 校验');
   }
 
   const { userAuth } = await getAuthInstances(c.env.DB);

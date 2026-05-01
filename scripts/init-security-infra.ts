@@ -32,9 +32,16 @@ async function main() {
     const turnstile = await CloudflareService.ensureTurnstileWidget(
       env, 
       'Member Login Protection', 
-      ['ycz.me', 'localhost', '127.0.0.1'] as any // 传递数组
+      ['ycz.me', 'localhost', '127.0.0.1'] as any
     );
-    console.log(`✅ [Setup] Turnstile Site Key: ${turnstile.siteKey}`);
+    console.log(`✅ [Setup] Member Turnstile Site Key: ${turnstile.siteKey}`);
+
+    const adminTurnstile = await CloudflareService.ensureTurnstileWidget(
+      env,
+      'Admin Login Protection',
+      ['ycz.me', 'localhost', '127.0.0.1'] as any
+    );
+    console.log(`✅ [Setup] Admin Turnstile Site Key: ${adminTurnstile.siteKey}`);
 
     // 4. 更新 wrangler.toml
     // 检查是否已有 RATE_LIMITER 绑定
@@ -44,9 +51,14 @@ async function main() {
     }
 
     // 更新环境变量
-    const varsUpdate = `\nTURNSTILE_SITE_KEY = "${turnstile.siteKey}"\nTURNSTILE_SECRET_KEY = "${turnstile.secretKey}"\n`;
     if (!wranglerContent.includes('TURNSTILE_SITE_KEY')) {
+      const varsUpdate = `\nTURNSTILE_SITE_KEY = "${turnstile.siteKey}"\nTURNSTILE_SECRET_KEY = "${turnstile.secretKey}"\n`;
       wranglerContent = wranglerContent.replace('[vars]', '[vars]' + varsUpdate);
+    }
+    
+    if (!wranglerContent.includes('TURNSTILE_ADMIN_SITE_KEY')) {
+      const adminVarsUpdate = `\nTURNSTILE_ADMIN_SITE_KEY = "${adminTurnstile.siteKey}"\nTURNSTILE_ADMIN_SECRET_KEY = "${adminTurnstile.secretKey}"\n`;
+      wranglerContent = wranglerContent.replace('[vars]', '[vars]' + adminVarsUpdate);
     }
 
     fs.writeFileSync(wranglerPath, wranglerContent);
