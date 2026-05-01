@@ -28,8 +28,12 @@ async function main() {
     console.log(`✅ [Setup] KV RATE_LIMITER ID: ${kvId}`);
 
     // 3. 创建 Turnstile Widget
-    // 假设本地域名或通配符支持
-    const turnstile = await CloudflareService.ensureTurnstileWidget(env, 'Member Login Protection', 'ycz.me');
+    // 增加 localhost 支持本地开发调试
+    const turnstile = await CloudflareService.ensureTurnstileWidget(
+      env, 
+      'Member Login Protection', 
+      ['ycz.me', 'localhost', '127.0.0.1'] as any // 传递数组
+    );
     console.log(`✅ [Setup] Turnstile Site Key: ${turnstile.siteKey}`);
 
     // 4. 更新 wrangler.toml

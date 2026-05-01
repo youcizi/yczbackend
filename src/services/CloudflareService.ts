@@ -175,9 +175,16 @@ export class CloudflareService {
   }
 
   /**
-   * 确保 Turnstile Widget 存在
+   * 确保 Turnstile Widget 存在并同步域名
    */
-  static async ensureTurnstileWidget(env: { CF_ACCOUNT_ID: string, CF_API_TOKEN: string }, name: string, domain: string): Promise<{ siteKey: string, secretKey: string }> {
+  static async ensureTurnstileWidget(
+    env: { CF_ACCOUNT_ID: string, CF_API_TOKEN: string }, 
+    name: string, 
+    domains: string | string[]
+  ): Promise<{ siteKey: string, secretKey: string }> {
+    const domainList = Array.isArray(domains) ? domains : [domains];
+    const rootDomains = domainList.map(d => this.extractRootDomain(d));
+
     const url = `${this.CF_API_BASE}/accounts/${env.CF_ACCOUNT_ID}/challenges/widgets`;
     const res = await fetch(url, {
       headers: { 'Authorization': `Bearer ${env.CF_API_TOKEN}` }
@@ -187,6 +194,19 @@ export class CloudflareService {
     if (data.success) {
       const existing = data.result.find((w: any) => w.name === name);
       if (existing) {
+        // 幂等更新域名列表
+        await fetch(`${url}/${existing.sitekey}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${env.CF_API_TOKEN}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name: name,
+            domains: rootDomains,
+            mode: 'managed'
+          })
+        });
         return { siteKey: existing.sitekey, secretKey: existing.secret };
       }
     }
@@ -200,7 +220,7 @@ export class CloudflareService {
       },
       body: JSON.stringify({
         name: name,
-        domains: [this.extractRootDomain(domain)],
+        domains: rootDomains,
         mode: 'managed'
       })
     });

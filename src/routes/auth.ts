@@ -115,7 +115,11 @@ auth.post('/member/login', async (c) => {
 
   // 2. 人机验证
   if (c.env.TURNSTILE_SECRET_KEY) {
-    const isHuman = await TurnstileService.verifyToken(c.env.TURNSTILE_SECRET_KEY, cfToken);
+    // 开发环境降级处理：如果是测试 Key 或者是 localhost 环境，使用测试 Secret
+    const isLocal = c.req.header('host')?.includes('localhost') || c.req.header('host')?.includes('127.0.0.1');
+    const secret = isLocal ? "1x00000000000000000000000000000000" : c.env.TURNSTILE_SECRET_KEY;
+    
+    const isHuman = await TurnstileService.verifyToken(secret, cfToken);
     if (!isHuman) {
       return c.json({ error: '安全验证失败，请重新尝试' }, 403);
     }
