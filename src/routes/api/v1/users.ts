@@ -10,7 +10,28 @@ const users = new Hono<{ Bindings: any }>();
  * 获取用户列表 (仅限 Member 类型，确保与系统管理员隔离)
  */
 users.get('/', requirePermission('user.view'), async (c) => {
+  const page = parseInt(c.req.query('page') || '1');
+  const pageSize = parseInt(c.req.query('pageSize') || '20');
+  const search = c.req.query('search') || '';
+  
   const db = await createDbClient(c.env.DB);
+  
+  // 1. 构建查询条件
+  const whereClause = and(
+    eq(schema.users.userType, 'member'),
+    search ? sql`(${schema.users.email} LIKE ${'%' + search + '%'} OR ${schema.members.nickname} LIKE ${'%' + search + '%'})` : undefined
+  );
+
+  // 2. 查询总数
+  const totalResult = await db.select({ count: sql<number>`count(*)` })
+    .from(schema.users)
+    .leftJoin(schema.members, eq(schema.users.id, schema.members.id))
+    .where(whereClause)
+    .get();
+  
+  const total = totalResult?.count || 0;
+
+  // 3. 分页查询数据
   const userList = await db.select({
     id: schema.users.id,
     email: schema.users.email,
@@ -29,10 +50,22 @@ users.get('/', requirePermission('user.view'), async (c) => {
   })
   .from(schema.users)
   .leftJoin(schema.members, eq(schema.users.id, schema.members.id))
-  .where(eq(schema.users.userType, 'member'))
+  .where(whereClause)
+  .orderBy(desc(schema.users.createdAt))
+  .limit(pageSize)
+  .offset((page - 1) * pageSize)
   .all();
   
-  return c.json(userList);
+  return c.json({
+    success: true,
+    data: userList,
+    meta: {
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize)
+    }
+  });
 });
 
 /**
