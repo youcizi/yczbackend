@@ -1,5 +1,6 @@
 import { eq, and, ne, inArray } from 'drizzle-orm';
-import { members } from '../../../db/schema/members';
+import { schema, createDbClient } from '../../../db';
+const { members } = schema;
 import { pMemberProfiles, pMemberAddresses, pMemberTiers, pMemberTiersI18n } from '../schema/tiers';
 import { hookManager } from '../../../lib/plugin-hooks';
 import { CoreService } from '../../../services/CoreService';

@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { IdentityService } from '../../../services/IdentityService';
+import { IdentityService } from '../../services/IdentityService';
 
 const api = new Hono<{ Bindings: any }>();
 

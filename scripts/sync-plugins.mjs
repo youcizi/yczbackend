@@ -38,8 +38,23 @@ async function sync() {
     registryImports += `const ${slug}AdminUI = lazy(() => import('../plugins/${slug}/admin/index').catch(() => ({ default: () => null })));\n`;
     
     registryEntries += `  '${slug}': {\n`;
-    registryEntries += `    getAdminApp: async () => (await import('../plugins/${slug}/index').catch(() => ({}))).default?.admin,\n`;
-    registryEntries += `    getStorefrontApp: async () => (await import('../plugins/${slug}/index').catch(() => ({}))).default?.storefront,\n`;
+    registryEntries += `    getAdminApp: async () => {\n`;
+    registryEntries += `      try {\n`;
+    registryEntries += `        const mod = await import('../plugins/${slug}/index');\n`;
+    registryEntries += `        return mod.default?.admin || mod.admin || mod.adminApp;\n`;
+    registryEntries += `      } catch (e) {\n`;
+    registryEntries += `        console.error('❌ [Registry] Failed to load admin app for ${slug}:', e);\n`;
+    registryEntries += `        return null;\n`;
+    registryEntries += `      }\n`;
+    registryEntries += `    },\n`;
+    registryEntries += `    getStorefrontApp: async () => {\n`;
+    registryEntries += `      try {\n`;
+    registryEntries += `        const mod = await import('../plugins/${slug}/index');\n`;
+    registryEntries += `        return mod.default?.storefront || mod.storefront || mod.sfApp;\n`;
+    registryEntries += `      } catch (e) {\n`;
+    registryEntries += `        return null;\n`;
+    registryEntries += `      }\n`;
+    registryEntries += `    },\n`;
     registryEntries += `    getManifest: async () => (await import('../plugins/${slug}/manifest').catch(() => ({}))).MANIFEST,\n`;
     registryEntries += `    getInit: async () => (await import('../plugins/${slug}/index').catch(() => ({}))).default?.init,\n`;
     registryEntries += `    frontend: ${slug}AdminUI,\n`;

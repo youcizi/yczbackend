@@ -177,6 +177,7 @@ plugins.all('/proxy/:slug/*', async (c, next) => {
   // 1. 拦截未启用或未安装的插件
   const plugin = await PluginService.checkPluginStatus(db, slug);
   if (!plugin || !plugin.isEnabled) {
+    console.warn(`🚫 [Proxy] 插件 ${slug} 未安装或未启用`);
     return c.json({ success: false, error: '插件不可用' }, 404);
   }
 
@@ -188,22 +189,38 @@ plugins.all('/proxy/:slug/*', async (c, next) => {
 
   // 2. 尝试本地动态分发 (单 Worker 逻辑)
   const bundle = PLUGIN_CODE_REGISTRY[slug];
-  const localApp = bundle ? await bundle.getAdminApp() : null;
+  if (!bundle) {
+    console.error(`❌ [Proxy] 注册表中未找到插件代码: ${slug}`);
+    return c.json({ success: false, error: '未找到插件执行链路' }, 502);
+  }
+
+  const localApp = await bundle.getAdminApp();
 
   if (localApp) {
     console.log(`🏠 [Local Dynamic Dispatch] RPC -> ${slug}: ${c.req.method} ${remainingPath}`);
     
     let body: any = null;
     if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
-      body = await c.req.raw.clone().arrayBuffer();
+      try {
+        body = await c.req.raw.clone().arrayBuffer();
+      } catch (e) {
+        console.warn(`⚠️ [Proxy] 读取请求体失败:`, e);
+      }
     }
 
-    return localApp.request(remainingPath, {
-      method: c.req.method,
-      headers: c.req.header(),
-      body: body
-    }, c.env);
+    try {
+      return await localApp.request(remainingPath, {
+        method: c.req.method,
+        headers: c.req.header(),
+        body: body
+      }, c.env);
+    } catch (e: any) {
+      console.error(`🔥 [Proxy] 插件执行崩溃 ${slug}:`, e);
+      return c.json({ success: false, error: `插件内部错误: ${e.message}` }, 500);
+    }
   }
+
+  console.error(`❌ [Proxy] 插件 ${slug} 加载后的实例为空`);
 
   // 3. 尝试 Service Binding 转发 (多 Worker 逻辑)
   const bindingName = `BINDING_${slug}`;

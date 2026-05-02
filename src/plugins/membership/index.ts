@@ -54,8 +54,12 @@ adminApp.post('/tiers', async (c) => {
   return c.json({ success: true, data: result });
 });
 
-export default {
+// 导出插件配置
+const membershipPlugin = {
   admin: adminApp,
   storefront: sfApp,
   init: () => MembershipService.initPlugin()
 };
+
+export default membershipPlugin;
+export { adminApp, sfApp };
