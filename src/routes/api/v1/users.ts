@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { IdentityService } from '../../../services/IdentityService';
-import { createDbClient, schema, eq, and } from '../../../db';
+import { createDbClient, schema, eq, and, sql, desc } from '../../../db';
 import { passwordHasher } from '../../../lib/auth';
 import { requirePermission } from '../../../middleware/rbac';
 
@@ -18,6 +18,14 @@ users.get('/', requirePermission('user.view'), async (c) => {
     status: schema.users.status,
     createdAt: schema.users.createdAt,
     level: schema.members.level,
+    nickname: schema.members.nickname,
+    avatar: schema.members.avatar,
+    phone: schema.members.phone,
+    gender: schema.members.gender,
+    birthday: schema.members.birthday,
+    balance: schema.members.balance,
+    points: schema.members.points,
+    bio: schema.members.bio,
   })
   .from(schema.users)
   .leftJoin(schema.members, eq(schema.users.id, schema.members.id))
@@ -25,6 +33,30 @@ users.get('/', requirePermission('user.view'), async (c) => {
   .all();
   
   return c.json(userList);
+});
+
+/**
+ * 用户搜索 (用于余额/积分管理时的下拉选择)
+ */
+users.get('/search', requirePermission('user.view'), async (c) => {
+  const q = c.req.query('q') || '';
+  const db = await createDbClient(c.env.DB);
+  
+  const results = await db.select({
+    id: schema.users.id,
+    email: schema.users.email,
+    nickname: schema.members.nickname,
+  })
+  .from(schema.users)
+  .leftJoin(schema.members, eq(schema.users.id, schema.members.id))
+  .where(and(
+    eq(schema.users.userType, 'member'),
+    sql`${schema.users.email} LIKE ${'%' + q + '%'} OR ${schema.members.nickname} LIKE ${'%' + q + '%'}`
+  ))
+  .limit(20)
+  .all();
+  
+  return c.json({ success: true, data: results });
 });
 
 /**
@@ -47,7 +79,7 @@ users.post('/', requirePermission('user.create'), async (c) => {
 });
 
 /**
- * 更新用户 (支持 Level 更新)
+ * 更新用户 (支持所有新字段)
  */
 users.put('/:id', requirePermission('user.update'), async (c) => {
   const id = c.req.param('id');
@@ -70,8 +102,22 @@ users.put('/:id', requirePermission('user.update'), async (c) => {
     );
 
     // 2. 业务表 (Member) 更新
+    const memberUpdate: any = {
+      level: body.level,
+      nickname: body.nickname,
+      avatar: body.avatar,
+      phone: body.phone,
+      gender: body.gender,
+      birthday: body.birthday,
+      bio: body.bio,
+      updatedAt: new Date()
+    };
+    
+    // 过滤掉 undefined
+    Object.keys(memberUpdate).forEach(key => memberUpdate[key] === undefined && delete memberUpdate[key]);
+
     batchQueries.push(
-      db.update(schema.members).set({ level: body.level }).where(eq(schema.members.id, id))
+      db.update(schema.members).set(memberUpdate).where(eq(schema.members.id, id))
     );
 
     await db.batch(batchQueries as any);
@@ -161,6 +207,140 @@ users.delete('/tokens/:tokenId', requirePermission('user.api_manage'), async (c)
   
   try {
     await db.delete(schema.apiTokens).where(eq(schema.apiTokens.id, parseInt(tokenId))).run();
+    return c.json({ success: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+/**
+ * [BALANCE] 获取余额变动日志
+ */
+users.get('/balance/logs', requirePermission('user.balance_manage'), async (c) => {
+  const db = await createDbClient(c.env.DB);
+  const logs = await db.select({
+    id: schema.balanceLogs.id,
+    userId: schema.balanceLogs.userId,
+    email: schema.users.email,
+    nickname: schema.members.nickname,
+    type: schema.balanceLogs.type,
+    amount: schema.balanceLogs.amount,
+    before: schema.balanceLogs.before,
+    after: schema.balanceLogs.after,
+    remark: schema.balanceLogs.remark,
+    createdAt: schema.balanceLogs.createdAt
+  })
+  .from(schema.balanceLogs)
+  .innerJoin(schema.users, eq(schema.balanceLogs.userId, schema.users.id))
+  .leftJoin(schema.members, eq(schema.balanceLogs.userId, schema.members.id))
+  .orderBy(desc(schema.balanceLogs.createdAt))
+  .all();
+  
+  return c.json({ success: true, data: logs });
+});
+
+/**
+ * [BALANCE] 调整余额
+ */
+users.post('/balance/adjust', requirePermission('user.balance_manage'), async (c) => {
+  const { userId, type, amount, remark } = await c.req.json();
+  const db = await createDbClient(c.env.DB);
+  
+  try {
+    const member = await db.select().from(schema.members).where(eq(schema.members.id, userId)).get();
+    if (!member) return c.json({ error: '用户不存在' }, 404);
+    
+    const before = member.balance;
+    let after = before;
+    let changeAmount = amount;
+    
+    if (type === 'add') after += amount;
+    else if (type === 'sub') after -= amount;
+    else if (type === 'set') {
+      after = amount;
+      changeAmount = amount - before;
+    }
+    
+    await db.batch([
+      db.update(schema.members).set({ balance: after }).where(eq(schema.members.id, userId)),
+      db.insert(schema.balanceLogs).values({
+        tenantId: 1,
+        userId,
+        type,
+        amount: changeAmount,
+        before,
+        after,
+        remark
+      })
+    ]);
+    
+    return c.json({ success: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+/**
+ * [POINTS] 获取积分变动日志
+ */
+users.get('/points/logs', requirePermission('user.points_manage'), async (c) => {
+  const db = await createDbClient(c.env.DB);
+  const logs = await db.select({
+    id: schema.pointsLogs.id,
+    userId: schema.pointsLogs.userId,
+    email: schema.users.email,
+    nickname: schema.members.nickname,
+    type: schema.pointsLogs.type,
+    amount: schema.pointsLogs.amount,
+    before: schema.pointsLogs.before,
+    after: schema.pointsLogs.after,
+    remark: schema.pointsLogs.remark,
+    createdAt: schema.pointsLogs.createdAt
+  })
+  .from(schema.pointsLogs)
+  .innerJoin(schema.users, eq(schema.pointsLogs.userId, schema.users.id))
+  .leftJoin(schema.members, eq(schema.pointsLogs.userId, schema.members.id))
+  .orderBy(desc(schema.pointsLogs.createdAt))
+  .all();
+  
+  return c.json({ success: true, data: logs });
+});
+
+/**
+ * [POINTS] 调整积分
+ */
+users.post('/points/adjust', requirePermission('user.points_manage'), async (c) => {
+  const { userId, type, amount, remark } = await c.req.json();
+  const db = await createDbClient(c.env.DB);
+  
+  try {
+    const member = await db.select().from(schema.members).where(eq(schema.members.id, userId)).get();
+    if (!member) return c.json({ error: '用户不存在' }, 404);
+    
+    const before = member.points;
+    let after = before;
+    let changeAmount = amount;
+    
+    if (type === 'add') after += amount;
+    else if (type === 'sub') after -= amount;
+    else if (type === 'set') {
+      after = amount;
+      changeAmount = amount - before;
+    }
+    
+    await db.batch([
+      db.update(schema.members).set({ points: after }).where(eq(schema.members.id, userId)),
+      db.insert(schema.pointsLogs).values({
+        tenantId: 1,
+        userId,
+        type,
+        amount: changeAmount,
+        before,
+        after,
+        remark
+      })
+    ]);
+    
     return c.json({ success: true });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);

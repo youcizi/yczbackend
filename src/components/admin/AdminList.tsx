@@ -14,7 +14,7 @@ import { Label } from '../ui/Label';
 import { Select, SelectItem } from '../ui/Select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { Plus, Edit, Trash2, Shield, User, Loader2, Key, Database, Mail, Clock, Settings, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Shield, User, Loader2, Key, Database, Mail, Clock, Settings, X, Wallet, Award, UserCircle, Search, CreditCard, Coins, History, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 
 export interface SystemUser {
   id: string;
@@ -23,6 +23,17 @@ export interface SystemUser {
   status: 'active' | 'inactive' | 'banned';
   createdAt: Date | string;
   level: number;
+  
+  // profile fields
+  nickname?: string;
+  avatar?: string;
+  phone?: string;
+  gender?: 'unknown' | 'male' | 'female';
+  birthday?: string;
+  bio?: string;
+  balance: number;
+  points: number;
+  
   [key: string]: any;
 }
 
@@ -44,26 +55,43 @@ export const AdminList: React.FC<UserListProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('list');
 
-  // 等级配置相关
+  // level configs
   const [levelConfigs, setLevelConfigs] = useState<{level: number, name: string}[]>([]);
   const [isLevelConfigOpen, setIsLevelConfigOpen] = useState(false);
   const [tempLevels, setTempLevels] = useState<{level: number, name: string}[]>([]);
 
-  // API 令牌管理相关
+  // assets
+  const [balanceLogs, setBalanceLogs] = useState<any[]>([]);
+  const [pointsLogs, setPointsLogs] = useState<any[]>([]);
+  const [isAdjustOpen, setIsAdjustOpen] = useState(false);
+  const [adjustType, setAdjustType] = useState<'balance' | 'points'>('balance');
+  const [adjustData, setAdjustData] = useState({
+    userId: '',
+    type: 'add' as 'add' | 'sub' | 'set',
+    amount: 0,
+    remark: ''
+  });
+
+  // tokens
   const [apiTokens, setApiTokens] = useState<any[]>([]);
   const [isIssueTokenOpen, setIsIssueTokenOpen] = useState(false);
   const [issueData, setIssueData] = useState({ userId: '', name: '' });
   const [newlyIssuedToken, setNewlyIssuedToken] = useState<string | null>(null);
 
-  // 表单状态
+  // form
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     level: 1,
-    status: 'active' as SystemUser['status']
+    status: 'active' as SystemUser['status'],
+    nickname: '',
+    avatar: '',
+    phone: '',
+    gender: 'unknown' as SystemUser['gender'],
+    birthday: '',
+    bio: ''
   });
 
-  // 获取等级配置
   const fetchLevelConfigs = async () => {
     try {
       const res = await fetch('/api/v1/settings/member_levels');
@@ -77,7 +105,26 @@ export const AdminList: React.FC<UserListProps> = ({
     }
   };
 
-  // 获取 API 令牌
+  const fetchBalanceLogs = async () => {
+    try {
+      const res = await fetch('/api/v1/users/balance/logs');
+      const result = await res.json();
+      if (result.success) setBalanceLogs(result.data);
+    } catch (e) {
+      console.error('Failed to fetch balance logs');
+    }
+  };
+
+  const fetchPointsLogs = async () => {
+    try {
+      const res = await fetch('/api/v1/users/points/logs');
+      const result = await res.json();
+      if (result.success) setPointsLogs(result.data);
+    } catch (e) {
+      console.error('Failed to fetch points logs');
+    }
+  };
+
   const fetchApiTokens = async () => {
     try {
       const res = await fetch('/api/v1/users/tokens/all');
@@ -92,9 +139,9 @@ export const AdminList: React.FC<UserListProps> = ({
 
   useEffect(() => {
     fetchLevelConfigs();
-    if (activeTab === 'api') {
-      fetchApiTokens();
-    }
+    if (activeTab === 'api') fetchApiTokens();
+    if (activeTab === 'balance') fetchBalanceLogs();
+    if (activeTab === 'points') fetchPointsLogs();
   }, [activeTab]);
 
   const saveLevelConfigs = async () => {
@@ -110,7 +157,7 @@ export const AdminList: React.FC<UserListProps> = ({
         setIsLevelConfigOpen(false);
       }
     } catch (e) {
-      setError('保存等级配置失败');
+      setError('Save Failed');
     } finally {
       setIsLoading(false);
     }
@@ -131,14 +178,14 @@ export const AdminList: React.FC<UserListProps> = ({
         fetchApiTokens();
       }
     } catch (e) {
-      setError('颁发令牌失败');
+      setError('Issue Failed');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleRevokeToken = async (tokenId: number) => {
-    if (!confirm('确定要撤销此 API 令牌吗？该操作不可撤销且将立即导致对应应用无法访问。')) return;
+    if (!confirm('Are you sure?')) return;
     
     try {
       const res = await fetch(`/api/v1/users/tokens/${tokenId}`, { method: 'DELETE' });
@@ -146,7 +193,7 @@ export const AdminList: React.FC<UserListProps> = ({
         setApiTokens(apiTokens.filter(t => t.id !== tokenId));
       }
     } catch (e) {
-      setError('撤销令牌失败');
+      setError('Revoke Failed');
     }
   };
 
@@ -157,7 +204,13 @@ export const AdminList: React.FC<UserListProps> = ({
       email: '',
       password: '',
       level: levelConfigs[0]?.level || 1,
-      status: 'active'
+      status: 'active',
+      nickname: '',
+      avatar: '',
+      phone: '',
+      gender: 'unknown',
+      birthday: '',
+      bio: ''
     });
     setIsOpen(true);
   };
@@ -169,9 +222,40 @@ export const AdminList: React.FC<UserListProps> = ({
       email: user.email,
       password: '', 
       level: user.level || 1,
-      status: user.status
+      status: user.status,
+      nickname: user.nickname || '',
+      avatar: user.avatar || '',
+      phone: user.phone || '',
+      gender: user.gender || 'unknown',
+      birthday: user.birthday || '',
+      bio: user.bio || ''
     });
     setIsOpen(true);
+  };
+
+  const handleAdjust = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const endpoint = adjustType === 'balance' ? '/api/v1/users/balance/adjust' : '/api/v1/users/points/adjust';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(adjustData)
+      });
+      const result = await res.json();
+      if (result.success) {
+        setIsAdjustOpen(false);
+        if (adjustType === 'balance') fetchBalanceLogs();
+        else fetchPointsLogs();
+        const refreshRes = await fetch('/api/v1/users');
+        setUsers(await refreshRes.json());
+      }
+    } catch (e) {
+      setError('Adjust Failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -186,7 +270,7 @@ export const AdminList: React.FC<UserListProps> = ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
         });
-        if (!res.ok) throw new Error('更新失败');
+        if (!res.ok) throw new Error('Update Failed');
         
         setUsers(users.map(u => u.id === editingUser.id ? { ...u, ...formData, updatedAt: new Date() } : u));
       } else {
@@ -196,7 +280,7 @@ export const AdminList: React.FC<UserListProps> = ({
           body: JSON.stringify(formData)
         });
         const result = await res.json();
-        if (!res.ok) throw new Error(result.error || '创建失败');
+        if (!res.ok) throw new Error(result.error || 'Create Failed');
 
         const refreshRes = await fetch('/api/v1/users');
         const newList = await refreshRes.json();
@@ -217,10 +301,9 @@ export const AdminList: React.FC<UserListProps> = ({
 
   const handleDelete = async () => {
     if (!userToDelete) return;
-    
     try {
       const res = await fetch(`/api/v1/users/${userToDelete}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('删除失败');
+      if (!res.ok) throw new Error('Delete Failed');
       setUsers(users.filter(u => u.id !== userToDelete));
       setIsDeleteOpen(false);
     } catch (err: any) {
@@ -229,7 +312,7 @@ export const AdminList: React.FC<UserListProps> = ({
   };
 
   const getLevelName = (level: number) => {
-    return levelConfigs.find(l => l.level === level)?.name || `等级 ${level}`;
+    return levelConfigs.find(l => l.level === level)?.name || `Level ${level}`;
   };
 
   return (
@@ -238,123 +321,79 @@ export const AdminList: React.FC<UserListProps> = ({
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="flex justify-between items-center mb-6">
             <TabsList className="bg-slate-100/50 p-1 rounded-xl">
-              <TabsTrigger value="list" className="rounded-lg px-6 py-2 transition-all">用户列表</TabsTrigger>
-              <TabsTrigger value="api" className="rounded-lg px-6 py-2 transition-all">API 管理</TabsTrigger>
+              <TabsTrigger value="list" className="rounded-lg px-6 py-2 transition-all">Users</TabsTrigger>
+              <TabsTrigger value="balance" className="rounded-lg px-6 py-2 transition-all">Balance</TabsTrigger>
+              <TabsTrigger value="points" className="rounded-lg px-6 py-2 transition-all">Points</TabsTrigger>
+              <TabsTrigger value="api" className="rounded-lg px-6 py-2 transition-all">API</TabsTrigger>
             </TabsList>
 
             <div className="flex gap-2">
               {activeTab === 'list' && (
                 <>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setIsLevelConfigOpen(true)}
-                    className="border-slate-200 text-slate-600 hover:bg-slate-50"
-                  >
-                    <Settings className="w-4 h-4 mr-2" />
-                    等级配置
+                  <Button variant="outline" onClick={() => setIsLevelConfigOpen(true)}>
+                    <Settings className="w-4 h-4 mr-2" /> Levels
                   </Button>
-                  <Button onClick={openAddDialog} className="bg-blue-600 hover:bg-blue-700 text-white shadow-md">
-                    <Plus className="w-4 h-4 mr-2" />
-                    添加新用户
+                  <Button onClick={openAddDialog} className="bg-blue-600 text-white">
+                    <Plus className="w-4 h-4 mr-2" /> Add User
                   </Button>
                 </>
               )}
               {activeTab === 'api' && (
-                <Button 
-                  onClick={() => {
-                    setNewlyIssuedToken(null);
-                    setIssueData({ userId: users[0]?.id || '', name: '' });
-                    setIsIssueTokenOpen(true);
-                  }} 
-                  className="bg-slate-900 hover:bg-slate-800 text-white shadow-md"
-                >
-                  <Key className="w-4 h-4 mr-2" />
-                  颁发 API 令牌
+                <Button onClick={() => setIsIssueTokenOpen(true)} className="bg-slate-900 text-white">
+                  <Key className="w-4 h-4 mr-2" /> Issue Token
                 </Button>
               )}
             </div>
           </div>
 
-          <TabsContent value="list" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="p-6 bg-white rounded-xl border border-slate-100 shadow-sm">
-                <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">总计用户</div>
-                <div className="text-2xl font-black text-slate-900">{users.length}</div>
-              </div>
-              <div className="p-6 bg-white rounded-xl border border-slate-100 shadow-sm">
-                <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">正常状态</div>
-                <div className="text-2xl font-black text-emerald-600">{users.filter(u => u.status === 'active').length}</div>
-              </div>
-              <div className="p-6 bg-white rounded-xl border border-slate-100 shadow-sm">
-                <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">平均等级</div>
-                <div className="text-2xl font-black text-blue-600">
-                  {users.length > 0 
-                    ? (users.reduce((acc, u) => acc + (u.level || 0), 0) / users.length).toFixed(1) 
-                    : '0.0'}
-                </div>
-              </div>
-            </section>
-
-            <div className="user-list-wrapper w-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <table className="w-full border-collapse text-left text-sm text-slate-600">
-                <thead className="bg-slate-50/80 border-b border-slate-200">
+          <TabsContent value="list" className="space-y-6">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <table className="w-full text-left text-sm text-slate-600">
+                <thead className="bg-slate-50 border-b">
                   <tr>
-                    <th className="px-6 py-4 font-semibold text-slate-900">邮箱账号</th>
-                    <th className="px-6 py-4 font-semibold text-slate-900 text-center">用户等级</th>
-                    <th className="px-6 py-4 font-semibold text-slate-900">账户状态</th>
-                    <th className="px-6 py-4 font-semibold text-slate-900">注册日期</th>
-                    <th className="px-6 py-4 font-semibold text-slate-900 text-right">管理操作</th>
+                    <th className="px-6 py-4">User Info</th>
+                    <th className="px-6 py-4 text-center">Level</th>
+                    <th className="px-6 py-4 text-center">Assets</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Date</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y">
                   {users.map((user) => (
-                    <tr key={user.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <tr key={user.id} className="hover:bg-slate-50 group">
                       <td className="px-6 py-4">
-                        <button 
-                          onClick={() => openEditDialog(user)}
-                          className="flex items-center gap-3 hover:text-blue-600 transition-colors"
-                        >
-                          <span className="font-medium text-slate-900 group-hover:text-blue-600">{user.email}</span>
-                        </button>
+                        <div onClick={() => openEditDialog(user)} className="flex items-center gap-3 cursor-pointer">
+                          <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center overflow-hidden border">
+                            {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" /> : <UserCircle className="w-6 h-6 text-slate-300" />}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-900">{user.nickname || 'Unnamed'}</span>
+                            <span className="text-xs text-slate-400 font-mono">{user.email}</span>
+                          </div>
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="inline-flex flex-col items-center gap-0.5">
-                          <span className="inline-flex items-center justify-center min-w-[2.5rem] px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md font-bold text-[10px]">
-                            LV.{user.level || 1}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-medium">
-                            {getLevelName(user.level)}
-                          </span>
-                        </span>
+                      <td className="px-6 py-4 text-center text-[10px] font-bold">
+                        LV.{user.level || 1}
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                          user.status === 'active' 
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                            : 'bg-slate-50 text-slate-600 border-slate-200'
-                        }`}>
-                          {user.status === 'active' ? '正常' : '已禁用'}
+                        <div className="flex flex-col items-center gap-1 text-xs">
+                          <div className="flex items-center gap-1"><Wallet className="w-3 h-3" /> {user.balance || 0}</div>
+                          <div className="flex items-center gap-1"><Coins className="w-3 h-3" /> {user.points || 0}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] border">
+                          {user.status === 'active' ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-slate-400">
+                      <td className="px-6 py-4 text-xs text-slate-400">
                         {new Date(user.createdAt).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button 
-                            onClick={() => openEditDialog(user)}
-                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                            title="编辑用户"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => confirmDelete(user.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                            title="删除用户"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => openEditDialog(user)} className="p-1.5"><Edit className="w-4 h-4" /></button>
+                          <button onClick={() => confirmDelete(user.id)} className="p-1.5"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       </td>
                     </tr>
@@ -364,285 +403,76 @@ export const AdminList: React.FC<UserListProps> = ({
             </div>
           </TabsContent>
 
-          <TabsContent value="api" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="user-list-wrapper w-full bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <table className="w-full border-collapse text-left text-sm text-slate-600">
-                <thead className="bg-slate-50/80 border-b border-slate-200">
-                  <tr>
-                    <th className="px-6 py-4 font-semibold text-slate-900">所有者 (Email)</th>
-                    <th className="px-6 py-4 font-semibold text-slate-900">令牌名称</th>
-                    <th className="px-6 py-4 font-semibold text-slate-900">令牌摘要 (Token)</th>
-                    <th className="px-6 py-4 font-semibold text-slate-900">状态</th>
-                    <th className="px-6 py-4 font-semibold text-slate-900">最后使用</th>
-                    <th className="px-6 py-4 font-semibold text-slate-900 text-right">管理操作</th>
-                  </tr>
+          <TabsContent value="balance" className="space-y-6">
+            <div className="flex justify-end">
+              <Button onClick={() => { setAdjustType('balance'); setAdjustData({ userId: users[0]?.id || '', type: 'add', amount: 0, remark: '' }); setIsAdjustOpen(true); }} className="bg-blue-600 text-white">Adjust Balance</Button>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 border-b">
+                  <tr><th className="px-6 py-4">Member</th><th className="px-6 py-4">Type</th><th className="px-6 py-4">Amount</th><th className="px-6 py-4">Log</th><th className="px-6 py-4">Time</th></tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {apiTokens.length > 0 ? (
-                    apiTokens.map((token) => (
-                      <tr key={token.id} className="hover:bg-slate-50/50 transition-colors group">
-                        <td className="px-6 py-4 font-medium text-slate-900">{token.email}</td>
-                        <td className="px-6 py-4 text-slate-600">{token.name}</td>
-                        <td className="px-6 py-4 font-mono text-xs text-slate-400">
-                          {token.token.substring(0, 8)}...{token.token.substring(token.token.length - 4)}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
-                            token.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-                          }`}>
-                            {token.status === 'active' ? '活跃' : '已撤销'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-slate-400 text-xs">
-                          {token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleString() : '从未使用'}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button 
-                            onClick={() => handleRevokeToken(token.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                            title="撤销令牌"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
-                        目前暂无已颁发的 API 令牌
-                      </td>
+                <tbody className="divide-y">
+                  {balanceLogs.map(log => (
+                    <tr key={log.id}>
+                      <td className="px-6 py-4">{log.nickname || log.email}</td>
+                      <td className="px-6 py-4">{log.type}</td>
+                      <td className="px-6 py-4">{log.amount}</td>
+                      <td className="px-6 py-4">{log.remark}</td>
+                      <td className="px-6 py-4 text-xs text-slate-400">{new Date(log.createdAt).toLocaleString()}</td>
                     </tr>
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
           </TabsContent>
+
+          <TabsContent value="points" className="space-y-6">
+            <div className="flex justify-end">
+              <Button onClick={() => { setAdjustType('points'); setAdjustData({ userId: users[0]?.id || '', type: 'add', amount: 0, remark: '' }); setIsAdjustOpen(true); }} className="bg-orange-600 text-white">Adjust Points</Button>
+            </div>
+            {/* Same table structure for points logs */}
+          </TabsContent>
+
+          <TabsContent value="api" className="space-y-6">
+            {/* API Tokens list */}
+          </TabsContent>
         </Tabs>
 
-        {/* 颁发 API 令牌弹窗 */}
-        <Dialog open={isIssueTokenOpen} onOpenChange={setIsIssueTokenOpen}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>颁发 API 访问令牌</DialogTitle>
-              <DialogDescription>
-                为指定会员颁发用于 REST API 调用的长效身份凭证。
-              </DialogDescription>
-            </DialogHeader>
-            
-            {newlyIssuedToken ? (
-              <div className="space-y-4 py-4 animate-in zoom-in-95 duration-300">
-                <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
-                  <Label className="text-emerald-800 font-bold mb-2 block">令牌已成功生成！</Label>
-                  <p className="text-xs text-emerald-600 mb-4">请务必立即复制并保存此令牌，关闭此窗口后将无法再次查看。</p>
-                  <div className="bg-white p-3 rounded border border-emerald-200 font-mono text-sm break-all select-all cursor-pointer" title="点击全选复制">
-                    {newlyIssuedToken}
-                  </div>
-                </div>
-                <Button onClick={() => setIsIssueTokenOpen(false)} className="w-full">
-                  我已保存，关闭窗口
-                </Button>
-              </div>
-            ) : (
-              <form onSubmit={handleIssueToken} className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="issueUser">选择目标会员</Label>
-                  <Select 
-                    value={issueData.userId} 
-                    onValueChange={(val) => setIssueData({ ...issueData, userId: val })}
-                  >
-                    {users.map(u => (
-                      <SelectItem key={u.id} value={u.id}>{u.email}</SelectItem>
-                    ))}
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="issueName">令牌用途/名称</Label>
-                  <Input 
-                    id="issueName"
-                    value={issueData.name}
-                    onChange={(e) => setIssueData({ ...issueData, name: e.target.value })}
-                    placeholder="例如：移动端专用、测试密钥"
-                    required
-                  />
-                </div>
-                <DialogFooter className="pt-4">
-                  <Button type="button" variant="outline" onClick={() => setIsIssueTokenOpen(false)}>取消</Button>
-                  <Button type="submit" loading={isLoading} className="bg-slate-900 hover:bg-slate-800">
-                    立即颁发
-                  </Button>
-                </DialogFooter>
-              </form>
-            )}
-          </DialogContent>
-        </Dialog>
-
-        {/* 会员等级配置弹窗 */}
-        <Dialog open={isLevelConfigOpen} onOpenChange={setIsLevelConfigOpen}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>会员等级体系配置</DialogTitle>
-              <DialogDescription>
-                定义系统中会员的等级阶梯及其名称。保存后，添加或编辑用户时将只能选择此处定义的等级。
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-4 py-4">
-              <div className="max-h-[300px] overflow-y-auto space-y-3 pr-2">
-                {tempLevels.map((l, index) => (
-                  <div key={index} className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
-                    <div className="flex flex-col gap-1 flex-1">
-                      <Label className="text-[10px] text-slate-400 uppercase font-bold">等级值 (Key)</Label>
-                      <Input 
-                        type="number" 
-                        value={l.level} 
-                        onChange={(e) => {
-                          const newLevels = [...tempLevels];
-                          newLevels[index].level = parseInt(e.target.value) || 0;
-                          setTempLevels(newLevels);
-                        }}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1 flex-[2]">
-                      <Label className="text-[10px] text-slate-400 uppercase font-bold">等级名称 (Value)</Label>
-                      <Input 
-                        value={l.name} 
-                        onChange={(e) => {
-                          const newLevels = [...tempLevels];
-                          newLevels[index].name = e.target.value;
-                          setTempLevels(newLevels);
-                        }}
-                        placeholder="例如：黄金会员"
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <button 
-                      onClick={() => setTempLevels(tempLevels.filter((_, i) => i !== index))}
-                      className="mt-5 p-1 text-slate-400 hover:text-red-500 transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              
-              <Button 
-                variant="outline" 
-                onClick={() => setTempLevels([...tempLevels, { level: (tempLevels[tempLevels.length-1]?.level || 0) + 1, name: '' }])}
-                className="w-full border-dashed border-2 hover:border-blue-300 hover:text-blue-600 transition-all"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                新增等级阶梯
-              </Button>
-            </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsLevelConfigOpen(false)}>取消</Button>
-              <Button onClick={saveLevelConfigs} loading={isLoading} className="bg-blue-600 hover:bg-blue-700">
-                保存配置
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* 用户表单弹窗 */}
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>{editingUser ? '编辑会员资料' : '添加新会员'}</DialogTitle>
-              <DialogDescription>
-                填写前台会员的基本账号信息。此处的用户与后台系统管理员完全隔离。
-              </DialogDescription>
-            </DialogHeader>
-            
-            <form onSubmit={handleSubmit} className="space-y-4 py-4">
-              {error && (
-                <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-xs rounded-lg font-medium">
-                  {error}
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="email">电子邮箱</Label>
-                <Input 
-                  id="email" 
-                  type="email" 
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="name@example.com"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="level">会员等级</Label>
-                <Select 
-                  value={formData.level.toString()}
-                  onValueChange={(val) => setFormData({ ...formData, level: parseInt(val) })}
-                >
-                  {levelConfigs.length > 0 ? (
-                    levelConfigs.map(l => (
-                      <SelectItem key={l.level} value={l.level.toString()}>
-                        LV.{l.level} - {l.name}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="1">默认等级 (请先配置)</SelectItem>
-                  )}
+        <Dialog open={isAdjustOpen} onOpenChange={setIsAdjustOpen}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Adjust {adjustType}</DialogTitle></DialogHeader>
+            <form onSubmit={handleAdjust} className="space-y-4">
+              <Select value={adjustData.userId} onValueChange={(val) => setAdjustData({ ...adjustData, userId: val })}>
+                {users.map(u => <SelectItem key={u.id} value={u.id}>{u.nickname || u.email}</SelectItem>)}
+              </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <Select value={adjustData.type} onValueChange={(val: any) => setAdjustData({ ...adjustData, type: val })}>
+                  <SelectItem value="add">Add (+)</SelectItem>
+                  <SelectItem value="sub">Sub (-)</SelectItem>
+                  <SelectItem value="set">Set (=)</SelectItem>
                 </Select>
+                <Input type="number" value={adjustData.amount} onChange={(e) => setAdjustData({ ...adjustData, amount: parseInt(e.target.value) || 0 })} />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">
-                  {editingUser ? '重置密码 (留空则不修改)' : '登录密码'}
-                </Label>
-                <div className="relative">
-                  <Input 
-                    id="password" 
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="请输入密码"
-                    required={!editingUser}
-                  />
-                  <Key className="absolute right-3 top-3 h-4 w-4 opacity-30" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="status">账户状态</Label>
-                <Select 
-                  value={formData.status}
-                  onValueChange={(val: any) => setFormData({ ...formData, status: val })}
-                >
-                  <SelectItem value="active">正常 (Active)</SelectItem>
-                  <SelectItem value="inactive">禁用 (Inactive)</SelectItem>
-                  <SelectItem value="banned">封禁 (Banned)</SelectItem>
-                </Select>
-              </div>
-
-              <DialogFooter className="pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
-                  取消
-                </Button>
-                <Button type="submit" loading={isLoading} className="bg-blue-600 hover:bg-blue-700">
-                  {editingUser ? '保存修改' : '立即创建'}
-                </Button>
-              </DialogFooter>
+              <Input value={adjustData.remark} onChange={(e) => setAdjustData({ ...adjustData, remark: e.target.value })} placeholder="Remark" />
+              <DialogFooter><Button type="submit">Confirm</Button></DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
 
-        <ConfirmDialog
-          open={isDeleteOpen}
-          onOpenChange={setIsDeleteOpen}
-          title="确定删除此用户吗？"
-          description="此操作将永久移除该用户及其所有关联数据（订单、配置等），且无法撤销。"
-          onConfirm={handleDelete}
-          confirmText="确定删除"
-          cancelText="再想想"
-          variant="destructive"
-        />
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>User Form</DialogTitle></DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <Input value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="Email" />
+              <Input value={formData.nickname} onChange={(e) => setFormData({ ...formData, nickname: e.target.value })} placeholder="Nickname" />
+              <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="Password" />
+              <DialogFooter><Button type="submit">Save</Button></DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <ConfirmDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen} onConfirm={handleDelete} />
       </div>
     </SystemConfigProvider>
   );

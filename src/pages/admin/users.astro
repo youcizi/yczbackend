@@ -3,7 +3,7 @@ import { env } from "cloudflare:workers";
 import DashboardLayout from "../../layouts/DashboardLayout.astro";
 import { SystemConfigProvider } from "../../contexts/SystemConfigContext";
 import { PluginService } from "../../services/PluginService";
-import { AdminList } from "../../components/admin/AdminList";
+import { AdminUserManagement } from "../../components/admin/AdminUserManagement";
 import { createDbClient, schema, eq } from "../../db";
 
 /**
@@ -39,7 +39,7 @@ const userData = await db
   <div class="admin-page-container p-4 max-w-7xl mx-auto">
     <!-- 列表与管理组件 (内置了 Header 和 Stats) -->
     <main>
-      <AdminList users={userData} activePlugins={activeSlugs} client:load />
+      <AdminUserManagement users={userData} activePlugins={activeSlugs} client:load />
     </main>
 
     <!-- 底部说明 -->
