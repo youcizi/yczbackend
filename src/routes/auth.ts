@@ -296,7 +296,12 @@ auth.get('/member/me', async (c) => {
     id: schema.users.id,
     email: schema.users.email,
     level: schema.members.level,
-    status: schema.users.status
+    status: schema.users.status,
+    nickname: schema.members.nickname,
+    avatar: schema.members.avatar,
+    gender: schema.members.gender,
+    balance: schema.members.balance,
+    points: schema.members.points
   })
   .from(schema.users)
   .leftJoin(schema.members, eq(schema.users.id, schema.members.id))
@@ -304,6 +309,34 @@ auth.get('/member/me', async (c) => {
   .get();
 
   return c.json({ user: profile });
+});
+
+/**
+ * 更新会员个人资料
+ */
+auth.post('/member/update-profile', async (c) => {
+  const { userAuth } = await getAuthInstances(c.env.DB);
+  const { nickname, gender, avatar } = await c.req.json();
+  const authHeader = c.req.header('Cookie');
+  const sessionId = userAuth.readSessionCookie(authHeader ?? '');
+  
+  if (!sessionId) return c.json({ error: 'Unauthorized' }, 401);
+  const { user } = await userAuth.validateSession(sessionId);
+  if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+  const db = await createDbClient(c.env.DB);
+  
+  await db.update(schema.members)
+    .set({ 
+      nickname, 
+      gender, 
+      avatar,
+      updatedAt: new Date()
+    })
+    .where(eq(schema.members.id, user.id))
+    .run();
+
+  return c.json({ success: true, message: '资料已更新' });
 });
 
 /**

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { memberApi } from '../lib/api';
+import { Sidebar } from '../components/Sidebar';
 
-export const Security: React.FC<{ onNavigate: (p: any) => void }> = ({ onNavigate }) => {
+export const Security: React.FC<{ onNavigate: (p: any) => void, onLogout: () => void }> = ({ onNavigate, onLogout }) => {
   const [formData, setFormData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -32,23 +33,7 @@ export const Security: React.FC<{ onNavigate: (p: any) => void }> = ({ onNavigat
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
-      <aside className="w-full lg:w-64 bg-white border-r border-slate-100 flex flex-col p-6 space-y-6">
-        <div className="flex items-center gap-3 px-2">
-          <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black shadow-lg">M</div>
-          <span className="font-black text-xl tracking-tight">会员中心</span>
-        </div>
-        <nav className="flex-1 space-y-1">
-          <button onClick={() => onNavigate('dashboard')} className="w-full flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-2xl font-bold transition-all">
-            控制台概览
-          </button>
-          <button onClick={() => onNavigate('profile')} className="w-full flex items-center gap-3 px-4 py-3 text-slate-500 hover:bg-slate-50 rounded-2xl font-bold transition-all">
-            个人资料
-          </button>
-          <button onClick={() => onNavigate('security')} className="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 text-blue-600 rounded-2xl font-bold transition-all">
-            安全设置
-          </button>
-        </nav>
-      </aside>
+      <Sidebar currentPage="security" onNavigate={onNavigate} onLogout={onLogout} />
 
       <main className="flex-1 p-6 lg:p-12 space-y-8">
         <header>

@@ -52,7 +52,7 @@ async function performSystemSync(c: any, registry: PermissionRegistry) {
       await db.run(sql`CREATE TABLE IF NOT EXISTS admins_to_roles (admin_id TEXT NOT NULL, role_id INTEGER NOT NULL, tenant_id INTEGER DEFAULT 0, PRIMARY KEY(admin_id, role_id, tenant_id))`);
 
       await db.run(sql`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, tenant_id INTEGER NOT NULL, email TEXT NOT NULL, password_hash TEXT NOT NULL, user_type TEXT NOT NULL, status TEXT DEFAULT 'active', created_at INTEGER, updated_at INTEGER, UNIQUE(tenant_id, email))`);
-      await db.run(sql`CREATE TABLE IF NOT EXISTS members (id TEXT PRIMARY KEY, type TEXT DEFAULT 'registered', level INTEGER DEFAULT 1)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS members (id TEXT PRIMARY KEY, type TEXT DEFAULT 'registered', level INTEGER DEFAULT 1, nickname TEXT, avatar TEXT, phone TEXT, gender TEXT DEFAULT 'unknown', balance INTEGER NOT NULL DEFAULT 0, points INTEGER NOT NULL DEFAULT 0, createdAt INTEGER, updatedAt INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS admins (id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS languages (code TEXT PRIMARY KEY, name TEXT NOT NULL, status TEXT DEFAULT 'active', is_default INTEGER DEFAULT 0, created_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS plugins (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT UNIQUE NOT NULL, name TEXT NOT NULL, config TEXT, config_schema TEXT, is_enabled INTEGER DEFAULT 0, created_at INTEGER, updated_at INTEGER)`);
@@ -75,7 +75,13 @@ async function performSystemSync(c: any, registry: PermissionRegistry) {
         `ALTER TABLE permissions ADD COLUMN plugin_slug TEXT`,
         `ALTER TABLE collections ADD COLUMN menu_group TEXT`,
         `ALTER TABLE collections ADD COLUMN menu_order INTEGER DEFAULT 0`,
-        `ALTER TABLE collections ADD COLUMN field_config TEXT`
+        `ALTER TABLE collections ADD COLUMN field_config TEXT`,
+        `ALTER TABLE members ADD COLUMN nickname TEXT`,
+        `ALTER TABLE members ADD COLUMN avatar TEXT`,
+        `ALTER TABLE members ADD COLUMN phone TEXT`,
+        `ALTER TABLE members ADD COLUMN gender TEXT DEFAULT 'unknown'`,
+        `ALTER TABLE members ADD COLUMN balance INTEGER NOT NULL DEFAULT 0`,
+        `ALTER TABLE members ADD COLUMN points INTEGER NOT NULL DEFAULT 0`
       ];
       for (const cmd of alters) {
         try { await db.run(sql.raw(cmd)); } catch (e) { }

@@ -59,9 +59,9 @@ export const App: React.FC = () => {
       case 'dashboard': 
         return <Dashboard user={user} onNavigate={setCurrentPage} onLogout={handleLogout} />;
       case 'profile': 
-        return <Profile user={user} onNavigate={setCurrentPage} onUpdate={checkAuth} />;
+        return <Profile user={user} onNavigate={setCurrentPage} onUpdate={checkAuth} onLogout={handleLogout} />;
       case 'security': 
-        return <Security onNavigate={setCurrentPage} />;
+        return <Security onNavigate={setCurrentPage} onLogout={handleLogout} />;
       default: 
         return <Login onNavigate={setCurrentPage} onLoginSuccess={checkAuth} />;
     }

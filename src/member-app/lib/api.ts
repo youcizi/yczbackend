@@ -38,6 +38,16 @@ export const memberApi = {
     return res.json();
   },
 
+  // 更新个人资料
+  async updateProfile(data: any) {
+    const res = await fetch('/api/auth/member/update-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return res.json();
+  },
+
   // 修改密码
   async resetPassword(data: any) {
     const res = await fetch('/api/auth/member/reset-password', {
