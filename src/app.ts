@@ -49,10 +49,11 @@ async function performSystemSync(c: any, registry: PermissionRegistry) {
       await db.run(sql`CREATE TABLE IF NOT EXISTS entities (id INTEGER PRIMARY KEY AUTOINCREMENT, collection_id INTEGER NOT NULL, data_json TEXT NOT NULL, locale TEXT DEFAULT 'en-US', translation_group TEXT, created_by TEXT, metadata TEXT, created_at INTEGER, updated_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS admins (id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS admin_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES admins(id), expires_at INTEGER NOT NULL)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS member_sessions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES members(id), expires_at INTEGER NOT NULL)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS admins_to_roles (admin_id TEXT NOT NULL, role_id INTEGER NOT NULL, tenant_id INTEGER DEFAULT 0, PRIMARY KEY(admin_id, role_id, tenant_id))`);
 
       await db.run(sql`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, tenant_id INTEGER NOT NULL, email TEXT NOT NULL, password_hash TEXT NOT NULL, user_type TEXT NOT NULL, status TEXT DEFAULT 'active', created_at INTEGER, updated_at INTEGER, UNIQUE(tenant_id, email))`);
-      await db.run(sql`CREATE TABLE IF NOT EXISTS members (id TEXT PRIMARY KEY, type TEXT DEFAULT 'registered', level INTEGER DEFAULT 1, nickname TEXT, avatar TEXT, phone TEXT, gender TEXT DEFAULT 'unknown', balance INTEGER NOT NULL DEFAULT 0, points INTEGER NOT NULL DEFAULT 0, createdAt INTEGER, updatedAt INTEGER)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS members (id TEXT PRIMARY KEY, type TEXT DEFAULT 'registered', level INTEGER DEFAULT 1, nickname TEXT, avatar TEXT, phone TEXT, gender TEXT DEFAULT 'unknown', birthday TEXT, bio TEXT, balance INTEGER NOT NULL DEFAULT 0, points INTEGER NOT NULL DEFAULT 0, metadata TEXT, created_at INTEGER, updated_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS languages (code TEXT PRIMARY KEY, name TEXT NOT NULL, status TEXT DEFAULT 'active', is_default INTEGER DEFAULT 0, created_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS plugins (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT UNIQUE NOT NULL, name TEXT NOT NULL, config TEXT, config_schema TEXT, is_enabled INTEGER DEFAULT 0, created_at INTEGER, updated_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS media_items (id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT NOT NULL, filename TEXT NOT NULL, mime_type TEXT NOT NULL, size INTEGER NOT NULL, is_remote INTEGER DEFAULT 0, created_by TEXT, metadata TEXT, created_at INTEGER)`);
@@ -60,6 +61,10 @@ async function performSystemSync(c: any, registry: PermissionRegistry) {
       await db.run(sql`CREATE TABLE IF NOT EXISTS p_member_profiles (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, member_id TEXT NOT NULL, name TEXT, avatar TEXT, phone TEXT, account_type TEXT DEFAULT 'individual', tier_id INTEGER DEFAULT 1, metadata TEXT, created_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS p_member_tiers (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, name TEXT NOT NULL, discount_rate INTEGER DEFAULT 100, created_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS p_member_tiers_i18n (id INTEGER PRIMARY KEY AUTOINCREMENT, tier_id INTEGER NOT NULL, lang_code TEXT NOT NULL, name TEXT NOT NULL, UNIQUE(tier_id, lang_code))`);
+      
+      // 资产变动日志
+      await db.run(sql`CREATE TABLE IF NOT EXISTS balance_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id TEXT NOT NULL, type TEXT NOT NULL, amount INTEGER NOT NULL, before INTEGER NOT NULL, after INTEGER NOT NULL, remark TEXT, created_at INTEGER)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS points_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, user_id TEXT NOT NULL, type TEXT NOT NULL, amount INTEGER NOT NULL, before INTEGER NOT NULL, after INTEGER NOT NULL, remark TEXT, created_at INTEGER)`);
 
       // 核心业务：询盘
       await db.run(sql`CREATE TABLE IF NOT EXISTS inquiries (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, member_id TEXT, email TEXT NOT NULL, content TEXT NOT NULL, verify_token TEXT, status TEXT DEFAULT 'pending', source_url TEXT, metadata TEXT, created_at INTEGER, updated_at INTEGER)`);
@@ -80,7 +85,16 @@ async function performSystemSync(c: any, registry: PermissionRegistry) {
         `ALTER TABLE members ADD COLUMN phone TEXT`,
         `ALTER TABLE members ADD COLUMN gender TEXT DEFAULT 'unknown'`,
         `ALTER TABLE members ADD COLUMN balance INTEGER NOT NULL DEFAULT 0`,
-        `ALTER TABLE members ADD COLUMN points INTEGER NOT NULL DEFAULT 0`
+        `ALTER TABLE members ADD COLUMN points INTEGER NOT NULL DEFAULT 0`,
+        `ALTER TABLE members ADD COLUMN birthday TEXT`,
+        `ALTER TABLE members ADD COLUMN bio TEXT`,
+        `ALTER TABLE members ADD COLUMN metadata TEXT`,
+        `ALTER TABLE members ADD COLUMN created_at INTEGER`,
+        `ALTER TABLE members ADD COLUMN updated_at INTEGER`,
+        `ALTER TABLE balance_logs ADD COLUMN before INTEGER NOT NULL DEFAULT 0`,
+        `ALTER TABLE balance_logs ADD COLUMN after INTEGER NOT NULL DEFAULT 0`,
+        `ALTER TABLE points_logs ADD COLUMN before INTEGER NOT NULL DEFAULT 0`,
+        `ALTER TABLE points_logs ADD COLUMN after INTEGER NOT NULL DEFAULT 0`
       ];
       for (const cmd of alters) {
         try { await db.run(sql.raw(cmd)); } catch (e) { }

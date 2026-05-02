@@ -303,6 +303,8 @@ users.post('/balance/adjust', requirePermission('user.balance_manage'), async (c
         amount: changeAmount,
         before,
         after,
+        beforeAmount: before,
+        afterAmount: after,
         remark
       })
     ]);
@@ -370,6 +372,8 @@ users.post('/points/adjust', requirePermission('user.points_manage'), async (c) 
         amount: changeAmount,
         before,
         after,
+        beforeAmount: before,
+        afterAmount: after,
         remark
       })
     ]);

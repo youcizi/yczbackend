@@ -16,6 +16,10 @@ export const balanceLogs = sqliteTable('balance_logs', {
   
   remark: text('remark'), // 备注
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+  
+  // 兼容性字段：防止旧表 NOT NULL 约束报错
+  beforeAmount: integer('before_amount'),
+  afterAmount: integer('after_amount'),
 }, (t) => ({
   tenantUserIdx: index('balance_tenant_user_idx').on(t.tenantId, t.userId),
 }));
@@ -35,6 +39,10 @@ export const pointsLogs = sqliteTable('points_logs', {
   
   remark: text('remark'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+
+  // 兼容性字段：防止旧表 NOT NULL 约束报错
+  beforeAmount: integer('before_amount'),
+  afterAmount: integer('after_amount'),
 }, (t) => ({
   tenantUserIdx: index('points_tenant_user_idx').on(t.tenantId, t.userId),
 }));
