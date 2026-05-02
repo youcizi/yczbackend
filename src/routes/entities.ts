@@ -335,6 +335,11 @@ async function checkCircularRelation(db: any, currentId: number, targetParentId:
 
 /**
  * 列表查询 (GET /api/v1/entities/:slug)
+ * 支持参数：
+ *   ?page=1          当前页码（默认 1）
+ *   ?pageSize=20     每页条数（默认 20，最大 100）
+ *   ?search=xxx      关键词搜索（全文匹配 dataJson 列）
+ *   ?locale=zh-CN    语种过滤
  */
 entitiesRouter.get('/:slug', dynamicGuard, async (c) => {
   const db = await createDbClient(c.env.DB);
@@ -343,16 +348,40 @@ entitiesRouter.get('/:slug', dynamicGuard, async (c) => {
   const isAdmin = c.get('isAdmin');
   const ownerOnly = c.get('ownerOnlyMode');
   const user = c.get('user');
+
+  // 解析分页与搜索参数
+  const page = Math.max(1, parseInt(c.req.query('page') || '1'));
+  const pageSize = Math.min(100, Math.max(1, parseInt(c.req.query('pageSize') || '20')));
+  const search = c.req.query('search') || '';
+  const localeFilter = c.req.query('locale') || '';
   
-  let whereClause = eq(entities.collectionId, collection.id);
-  // 记录级隔离：如果开启且非管理员，只查自己的
+  // 构建 where 条件
+  let whereClause: any = eq(entities.collectionId, collection.id);
   if (ownerOnly && !isAdmin && user) {
-    whereClause = and(whereClause, eq(entities.createdBy, user.id)) as any;
+    whereClause = and(whereClause, eq(entities.createdBy, user.id));
+  }
+  if (localeFilter && localeFilter !== 'all') {
+    whereClause = and(whereClause, eq(entities.locale, localeFilter));
+  }
+  if (search) {
+    // NOTE: 针对动态 JSON 内容进行全文搜索，使用 LIKE 匹配序列化后的 dataJson
+    whereClause = and(whereClause, sql`${entities.dataJson} LIKE ${'%' + search + '%'}`);
   }
 
+  // 1. 查询总条数
+  const countResult = await db.select({ count: sql<number>`count(*)` })
+    .from(entities)
+    .where(whereClause)
+    .get();
+  const total = countResult?.count || 0;
+
+  // 2. 分页查询数据
   const rawResults = await db.select()
     .from(entities)
     .where(whereClause)
+    .orderBy(sql`${entities.createdAt} desc`)
+    .limit(pageSize)
+    .offset((page - 1) * pageSize)
     .all();
 
   // 执行 Populate
@@ -363,7 +392,6 @@ entitiesRouter.get('/:slug', dynamicGuard, async (c) => {
   const fieldsWithSettings = (model.fieldsJson as any[]).map(f => {
     const setting = actualConfig[f.name];
     
-    // Inject options for enums
     if (['radio', 'select', 'multi_select', 'checkbox'].includes(f.type) && setting?.options) {
       f.options = setting.options;
     }
@@ -374,12 +402,11 @@ entitiesRouter.get('/:slug', dynamicGuard, async (c) => {
 
       return {
         ...f,
-        type: (f.type === 'image' || f.type === 'multi_image') && !setting ? f.type : f.type, // keep type intact
+        type: (f.type === 'image' || f.type === 'multi_image') && !setting ? f.type : f.type,
         relationConfig: {
           collectionSlug: targetSlug,
           displayField: setting?.display_field || setting?.displayField || 'name'
         },
-        // 媒体钩子预留
         isMedia: targetSlug === 'media_library' || 
                  targetSlug.includes('image') || 
                  targetSlug.includes('file')
@@ -389,11 +416,17 @@ entitiesRouter.get('/:slug', dynamicGuard, async (c) => {
   });
 
   return c.json({
-    data: results.sort((a, b) => b.createdAt - a.createdAt),
+    data: results,
     model: {
       name: collection.name,
       slug: collection.slug,
       fieldsJson: fieldsWithSettings
+    },
+    meta: {
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize)
     }
   });
 });

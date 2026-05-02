@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, 
   Search, 
@@ -15,8 +15,20 @@ import {
   User,
   Mail,
   Building2,
-  Globe
+  Globe,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
+
+// 防抖 Hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = React.useState<T>(value);
+  React.useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
@@ -64,23 +76,31 @@ export const LeadsCenter: React.FC = () => {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [newNote, setNewNote] = useState('');
   const [savingStatus, setSavingStatus] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
+  const debouncedSearch = useDebounce(searchQuery, 500);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchLeads();
-  }, []);
-
-  const fetchLeads = async () => {
+  const fetchLeads = async (page = 1, status = statusFilter, search = debouncedSearch) => {
+    setLoading(true);
     try {
-      const res = await fetch('/api/v1/crm/leads');
+      const params = new URLSearchParams({ page: String(page), pageSize: '20', ...(status ? { status } : {}), ...(search ? { search } : {}) });
+      const res = await fetch(`/api/v1/crm/leads?${params}`);
       const data = await res.json();
-      setLeads(data);
+      if (data.success) {
+        setLeads(data.data);
+        setPagination(prev => ({ ...prev, ...data.meta }));
+      }
     } catch (e) {
       toast({ variant: 'destructive', title: '加载失败', description: '无法获取线索中心数据' });
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => { fetchLeads(1, statusFilter, debouncedSearch); }, [debouncedSearch, statusFilter]);
+  useEffect(() => { fetchLeads(pagination.page, statusFilter, debouncedSearch); }, [pagination.page]);
 
   const handleUpdateStatus = async (id: number, status: string, note?: string) => {
     setSavingStatus(true);
@@ -116,13 +136,29 @@ export const LeadsCenter: React.FC = () => {
     };
   };
 
-  if (loading) {
+  if (loading && leads.length === 0) {
     return <div className="p-20 text-center"><Loader2 className="animate-spin mx-auto text-blue-500" /></div>;
   }
 
   return (
-    <div className="flex h-[calc(100vh-160px)] gap-6 overflow-hidden">
-      {/* 列表页 - 70% 宽度 */}
+    <div className="flex flex-col h-[calc(100vh-160px)] gap-4 overflow-hidden">
+      {/* 搜索与状态过滤栏 */}
+      <div className="flex flex-wrap items-center gap-3 bg-white p-3 rounded-xl border border-slate-100 shadow-sm shrink-0">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input className="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 rounded-lg border-none outline-none" placeholder="搜邮箱、公司、姓名..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+          {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-blue-500 animate-spin" />}
+        </div>
+        <div className="flex gap-1">
+          {['', 'pending', 'processing', 'closed', 'junk'].map(s => (
+            <button key={s} onClick={() => setStatusFilter(s)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${ statusFilter === s ? 'bg-blue-600 text-white shadow' : 'bg-slate-100 text-slate-500 hover:bg-slate-200' }`}>
+              {s === '' ? '全部' : STATUS_MAP[s]?.label}
+            </button>
+          ))}
+        </div>
+        <div className="text-xs text-slate-400">共 {pagination.total} 条</div>
+      </div>
+      <div className="flex flex-1 gap-4 overflow-hidden">
       <div className="flex-1 overflow-y-auto space-y-4">
         {leads.length === 0 ? (
           <Card className="text-center py-20 text-slate-400">
@@ -261,7 +297,7 @@ export const LeadsCenter: React.FC = () => {
                          <div className="absolute -left-[5px] top-1 w-2 h-2 rounded-full bg-slate-200" />
                          <div className="text-[10px] text-slate-400 flex justify-between mb-1">
                             <span>{note.user}</span>
-                            <span>{formatDate(note.time)}</span>
+                             <span>{formatDate(note.time)}</span>
                          </div>
                          <p className="text-xs text-slate-600 bg-slate-50 p-2 rounded-lg">{note.content}</p>
                       </div>
@@ -273,6 +309,22 @@ export const LeadsCenter: React.FC = () => {
           </div>
         )}
       </div>
+      </div>
+
+      {/* 分页控件 */}
+      {pagination.totalPages > 1 && (
+        <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-100 shadow-sm shrink-0">
+          <div className="text-xs text-slate-500">第 {pagination.page} / {pagination.totalPages} 页</div>
+          <div className="flex gap-2">
+            <button disabled={pagination.page <= 1 || loading} onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))} className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg border bg-white hover:bg-slate-50 disabled:opacity-40 transition-all">
+              <ChevronLeft size={14} /> 上一页
+            </button>
+            <button disabled={pagination.page >= pagination.totalPages || loading} onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))} className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-lg border bg-white hover:bg-slate-50 disabled:opacity-40 transition-all">
+              下一页 <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

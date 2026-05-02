@@ -1,4 +1,14 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+
+// NOTE: 防抖 Hook，避免在用户输入过程中频繁请求服务器
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
 import { 
   Plus, 
   Search, 
@@ -13,7 +23,10 @@ import {
   Globe,
   Columns3,
   Check,
-  ChevronDown
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Loader2
 } from 'lucide-react';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../ui/Table';
 import { Button } from '../ui/Button';
@@ -152,15 +165,25 @@ export const ContentManagement: React.FC<ContentManagementProps> = ({ slug }) =>
   const [languagesList, setLanguagesList] = useState<any[]>([]);
   const [filterLocale, setFilterLocale] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
+
   // NOTE: 列可见性状态，初始为空 Set，在 model 加载后从缓存初始化
   const [visibleFieldNames, setVisibleFieldNames] = useState<Set<string>>(new Set());
   const [colVisInitialized, setColVisInitialized] = useState(false);
 
-  const fetchData = async () => {
+  const debouncedSearch = useDebounce(searchQuery, 500);
+
+  const fetchData = async (page = 1, search = debouncedSearch, locale = filterLocale) => {
     setLoading(true);
     try {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pagination.pageSize),
+        ...(search ? { search } : {}),
+        ...(locale && locale !== 'all' ? { locale } : {})
+      });
       const [entriesRes, langsRes] = await Promise.all([
-        fetch(`/api/v1/entities/${slug}`),
+        fetch(`/api/v1/entities/${slug}?${params}`),
         fetch('/api/v1/rbac/languages')
       ]);
       
@@ -168,6 +191,9 @@ export const ContentManagement: React.FC<ContentManagementProps> = ({ slug }) =>
       const result = await entriesRes.json();
       setData(result.data);
       setModel(result.model);
+      if (result.meta) {
+        setPagination(prev => ({ ...prev, ...result.meta }));
+      }
 
       if (langsRes.ok) {
         setLanguagesList(await langsRes.json());
@@ -179,8 +205,18 @@ export const ContentManagement: React.FC<ContentManagementProps> = ({ slug }) =>
     }
   };
 
+  // 搜索词或语种变化时，重置到第一页并重新请求
   useEffect(() => {
-    fetchData();
+    setPagination(p => ({ ...p, page: 1 }));
+    fetchData(1, debouncedSearch, filterLocale);
+  }, [debouncedSearch, filterLocale, slug]);
+
+  // 仅页码变化时请求当前条件下的对应页
+  useEffect(() => {
+    fetchData(pagination.page, debouncedSearch, filterLocale);
+  }, [pagination.page]);
+
+  useEffect(() => {
     // 重置列可见性初始化标志，当 slug 变化时需要重新从缓存读取
     setColVisInitialized(false);
   }, [slug]);
@@ -294,35 +330,16 @@ export const ContentManagement: React.FC<ContentManagementProps> = ({ slug }) =>
     return result;
   };
 
-  // 核心逻辑：智能树形感应与多维度筛选 (语种 + 搜索)
-  const processedData = React.useMemo(() => {
+  // NOTE: 树形结构仍在前端处理，因为它依赖于同一页的数据层级关系
+  const processedData = useMemo(() => {
     if (data.length === 0) return [];
-
-    let filtered = [...data];
-
-    // 1. 语种筛选
-    if (filterLocale !== 'all') {
-      filtered = filtered.filter(item => item.locale === filterLocale);
-    }
-
-    // 2. 关键词搜索
-    if (searchQuery.trim()) {
-      const term = searchQuery.toLowerCase();
-      filtered = filtered.filter(item => {
-        const searchableText = `${item.title || ''} ${JSON.stringify(item)}`.toLowerCase();
-        return searchableText.includes(term);
-      });
-    }
-
-    // 3. 树形转换 (如有必要)
-    const hasParentLink = filtered.length > 0 && ('parent_id' in filtered[0]);
+    const hasParentLink = data.length > 0 && ('parent_id' in data[0]);
     if (hasParentLink) {
-      const tree = buildTree(filtered, { idKey: 'id', parentKey: 'parent_id' });
+      const tree = buildTree(data, { idKey: 'id', parentKey: 'parent_id' });
       return flattenTreeWithPrefix(tree, model?.fieldsJson?.find((f: any) => f.isListDisplay)?.name || 'name');
     }
-    
-    return filtered;
-  }, [data, slug, model, filterLocale, searchQuery]);
+    return data;
+  }, [data, model]);
 
   if (loading && !model) return <div className="p-8 text-center text-slate-500 animate-pulse">正在初始化引擎...</div>;
   if (!model) return <div className="p-8 text-center text-red-500 font-bold border-2 border-dashed border-red-200 rounded-xl bg-red-50/20">模型定义丢失或无效</div>;
@@ -385,9 +402,10 @@ export const ContentManagement: React.FC<ContentManagementProps> = ({ slug }) =>
            </div>
            
            <div className="flex items-center gap-2">
-             <Badge variant="ghost" className="text-slate-500 bg-slate-100/50">
-               找到 {processedData.length} / {data.length} 条记录
-             </Badge>
+              <Badge variant="ghost" className="text-slate-500 bg-slate-100/50">
+                {loading ? <Loader2 size={12} className="animate-spin inline mr-1" /> : null}
+                共 {pagination.total} 条记录
+              </Badge>
              <ColumnVisibilityDropdown
                allFields={model.fieldsJson}
                visibleFieldNames={visibleFieldNames}
@@ -510,7 +528,7 @@ export const ContentManagement: React.FC<ContentManagementProps> = ({ slug }) =>
                请完善 {model.name} 模型的基础信息。星号标记为必填项。
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="mt-4">
             <EntryForm 
               slug={slug}
