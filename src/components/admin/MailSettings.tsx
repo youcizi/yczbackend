@@ -4,6 +4,15 @@ import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { useToast } from '../ui/Toaster';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter,
+  DialogDescription
+} from '../ui/Dialog';
+import { Check } from 'lucide-react';
 
 export const MailSettings: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -40,6 +49,8 @@ export const MailSettings: React.FC = () => {
       });
   }, [toast]);
 
+  const [showSuccess, setShowSuccess] = useState(false);
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -49,7 +60,7 @@ export const MailSettings: React.FC = () => {
         body: JSON.stringify(form)
       });
       if (res.ok) {
-        toast({ title: '保存成功', description: '全局邮件配置已更新' });
+        setShowSuccess(true);
       } else {
         throw new Error('保存失败');
       }
@@ -162,6 +173,26 @@ export const MailSettings: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+      <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
+        <DialogContent className="max-w-sm text-center py-10">
+          <div className="flex justify-center mb-4">
+            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center">
+              <Check className="text-emerald-600 w-8 h-8" />
+            </div>
+          </div>
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl">保存成功</DialogTitle>
+            <DialogDescription className="text-center">
+              全局邮件配置已更新，即刻生效。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-6">
+            <Button onClick={() => setShowSuccess(false)} className="w-full bg-slate-900 text-white">
+              知道了
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

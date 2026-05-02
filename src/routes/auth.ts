@@ -212,7 +212,7 @@ auth.post('/member/send-code', async (c) => {
 
   // 2. 发送邮件
   try {
-    await MailService.sendMail(c.env, {
+    const sent = await MailService.sendMail(c.env, {
       to: email,
       subject: '您的注册验证码',
       html: `
@@ -224,6 +224,11 @@ auth.post('/member/send-code', async (c) => {
       `,
       senderName: 'YCZ.ME 独立站系统'
     });
+
+    if (!sent) {
+      return c.json({ error: '验证码发送失败，请联系管理员检查邮件配置' }, 500);
+    }
+
     return c.json({ success: true, message: '验证码已发送' });
   } catch (err: any) {
     console.error('Send code failed:', err);

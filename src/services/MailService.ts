@@ -33,8 +33,7 @@ export class MailService {
     });
 
     if (!record) {
-      console.warn('⚠️ [MailService] No mail_config found in system_settings.');
-      return false;
+      throw new Error('系统尚未配置邮件发送功能（缺少 mail_config 设置）。');
     }
 
     const config: MailConfig = JSON.parse(record.value);
