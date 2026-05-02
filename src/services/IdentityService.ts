@@ -74,7 +74,7 @@ export class IdentityService {
 
     // 🚀 核心钩子：身份注册完成 (用于插件扩展逻辑)
     if (user) {
-      await hookManager.emit('identity:registered', { user });
+      await hookManager.emit('identity:registered', { db, tenantId: data.tenantId }, { user });
     }
 
     return user;

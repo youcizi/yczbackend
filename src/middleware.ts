@@ -9,23 +9,6 @@ export const onRequest = defineMiddleware(async (context, next) => {
     const { cookies, redirect, locals, url, request } = context;
     let DB: any;
 
-    try {
-        // 生产与测试环境推荐：通过虚拟模块获取 D1 绑定
-        // @ts-ignore
-        const cf = await import('cloudflare:workers');
-        DB = cf.env?.DB || cf.DB;
-    } catch (e) {
-        // 本地/特定构建环境：从 locals 提取
-        DB = (locals as any).DB || (locals as any).runtime?.DB;
-    }
-
-    if (DB) {
-        // [Verified Pattern] 注入 locals 以供后续 Astro 页面使用
-        (locals as any).DB = DB;
-        if (!(locals as any).runtime) (locals as any).runtime = {};
-        (locals as any).runtime.DB = DB;
-    }
-
   try {
     // Astro v6 推荐通过 cloudflare:workers 获取 bindings
     // @ts-ignore
@@ -34,6 +17,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
   } catch (e) {
     // 回退方案：从 locals 尝试提取 (兼容 platformProxy)
     DB = (locals as any).runtime?.DB || (locals as any).DB;
+  }
+
+  if (DB) {
+    // 注入 locals 以供后续 Astro 页面使用
+    (locals as any).DB = DB;
+    if (!(locals as any).runtime) (locals as any).runtime = {};
+    (locals as any).runtime.DB = DB;
   }
   
   const env = {

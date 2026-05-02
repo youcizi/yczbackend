@@ -1,5 +1,5 @@
 import { eq, inArray } from 'drizzle-orm';
-import { permissions, rolePermissions, collections, models } from '../db/schema';
+import { permissions, rolePermissions, collections, models, plugins } from '../db/schema';
 
 export interface PermissionDef {
   slug: string;

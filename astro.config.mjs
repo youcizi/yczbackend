@@ -11,7 +11,7 @@ import { vitePluginWeaver } from './src/lib/vite-plugin-weaver';
 export default defineConfig({
   output: 'server', // 开启 SSR 模式
   adapter: cloudflare({
-    runtime: { mode: 'off' },
+    runtime: { mode: 'local' },
     platformProxy: {
       enabled: true,
       configPath: 'wrangler.toml',

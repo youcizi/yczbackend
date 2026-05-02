@@ -28,14 +28,15 @@ async function sync() {
   console.log(`✨ Found ${plugins.length} plugin candidates: [${plugins.join(', ')}]`);
 
   // --- 1. 生成 Registry 桥接代码 ---
-  let registryImports = `import { lazy } from 'react';\n`;
+  let registryImports = `import React, { lazy } from 'react';\n`;
   let registryEntries = `export const PLUGIN_CODE_REGISTRY: Record<string, any> = {\n`;
 
   // 这里的 import 使用静态字符串拼接，确保 Vite 能够识别并进行 Tree Shaking 和 Bundle
   plugins.forEach(slug => {
     registryImports += `// Plugin: ${slug}\n`;
     // 约定: 插件管理端 UI 入口固定为 admin/index.tsx
-    registryImports += `const ${slug}AdminUI = lazy(() => import('../plugins/${slug}/admin/index').catch(() => ({ default: () => null })));\n`;
+    // 核心修复：增加环境判定，防止在 SSR 阶段或构建阶段因为 lazy 导致组件为 null 或报错
+    registryImports += `const ${slug}AdminUI = (typeof window !== 'undefined') ? lazy(() => import('../plugins/${slug}/admin/index').catch(() => ({ default: () => null }))) : (() => null);\n`;
     
     registryEntries += `  '${slug}': {\n`;
     registryEntries += `    getAdminApp: async () => {\n`;

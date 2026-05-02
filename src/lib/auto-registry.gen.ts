@@ -1,6 +1,6 @@
-import { lazy } from 'react';
+import React, { lazy } from 'react';
 // Plugin: membership
-const membershipAdminUI = lazy(() => import('../plugins/membership/admin/index').catch(() => ({ default: () => null })));
+const membershipAdminUI = (typeof window !== 'undefined') ? lazy(() => import('../plugins/membership/admin/index').catch(() => ({ default: () => null }))) : (() => null);
 
 export const PLUGIN_CODE_REGISTRY: Record<string, any> = {
   'membership': {
