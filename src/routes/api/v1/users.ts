@@ -250,7 +250,32 @@ users.delete('/tokens/:tokenId', requirePermission('user.api_manage'), async (c)
  * [BALANCE] 获取余额变动日志
  */
 users.get('/balance/logs', requirePermission('user.balance_manage'), async (c) => {
+  const page = parseInt(c.req.query('page') || '1');
+  const pageSize = parseInt(c.req.query('pageSize') || '20');
+  const search = c.req.query('search') || '';
+
   const db = await createDbClient(c.env.DB);
+  
+  let whereClause = undefined;
+  if (search) {
+    const { or, like } = await import('drizzle-orm');
+    whereClause = or(
+      like(schema.users.email, `%${search}%`),
+      like(schema.members.nickname, `%${search}%`),
+      like(schema.balanceLogs.remark, `%${search}%`)
+    );
+  }
+
+  const { count } = await import('drizzle-orm');
+  const totalResult = await db.select({ count: count() })
+    .from(schema.balanceLogs)
+    .innerJoin(schema.users, eq(schema.balanceLogs.userId, schema.users.id))
+    .leftJoin(schema.members, eq(schema.balanceLogs.userId, schema.members.id))
+    .where(whereClause)
+    .get();
+
+  const total = totalResult?.count || 0;
+
   const logs = await db.select({
     id: schema.balanceLogs.id,
     userId: schema.balanceLogs.userId,
@@ -266,10 +291,22 @@ users.get('/balance/logs', requirePermission('user.balance_manage'), async (c) =
   .from(schema.balanceLogs)
   .innerJoin(schema.users, eq(schema.balanceLogs.userId, schema.users.id))
   .leftJoin(schema.members, eq(schema.balanceLogs.userId, schema.members.id))
+  .where(whereClause)
   .orderBy(desc(schema.balanceLogs.createdAt))
+  .limit(pageSize)
+  .offset((page - 1) * pageSize)
   .all();
   
-  return c.json({ success: true, data: logs });
+  return c.json({ 
+    success: true, 
+    data: logs,
+    meta: {
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize)
+    }
+  });
 });
 
 /**
@@ -319,7 +356,32 @@ users.post('/balance/adjust', requirePermission('user.balance_manage'), async (c
  * [POINTS] 获取积分变动日志
  */
 users.get('/points/logs', requirePermission('user.points_manage'), async (c) => {
+  const page = parseInt(c.req.query('page') || '1');
+  const pageSize = parseInt(c.req.query('pageSize') || '20');
+  const search = c.req.query('search') || '';
+
   const db = await createDbClient(c.env.DB);
+  
+  let whereClause = undefined;
+  if (search) {
+    const { or, like } = await import('drizzle-orm');
+    whereClause = or(
+      like(schema.users.email, `%${search}%`),
+      like(schema.members.nickname, `%${search}%`),
+      like(schema.pointsLogs.remark, `%${search}%`)
+    );
+  }
+
+  const { count } = await import('drizzle-orm');
+  const totalResult = await db.select({ count: count() })
+    .from(schema.pointsLogs)
+    .innerJoin(schema.users, eq(schema.pointsLogs.userId, schema.users.id))
+    .leftJoin(schema.members, eq(schema.pointsLogs.userId, schema.members.id))
+    .where(whereClause)
+    .get();
+
+  const total = totalResult?.count || 0;
+
   const logs = await db.select({
     id: schema.pointsLogs.id,
     userId: schema.pointsLogs.userId,
@@ -335,10 +397,22 @@ users.get('/points/logs', requirePermission('user.points_manage'), async (c) => 
   .from(schema.pointsLogs)
   .innerJoin(schema.users, eq(schema.pointsLogs.userId, schema.users.id))
   .leftJoin(schema.members, eq(schema.pointsLogs.userId, schema.members.id))
+  .where(whereClause)
   .orderBy(desc(schema.pointsLogs.createdAt))
+  .limit(pageSize)
+  .offset((page - 1) * pageSize)
   .all();
   
-  return c.json({ success: true, data: logs });
+  return c.json({ 
+    success: true, 
+    data: logs,
+    meta: {
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize)
+    }
+  });
 });
 
 /**

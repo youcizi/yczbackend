@@ -144,6 +144,12 @@ export const AdminUserManagement: React.FC<UserListProps> = ({ activePlugins = [
   const [tempLevels, setTempLevels] = useState<{level: number, name: string}[]>([]);
   const [balanceLogs, setBalanceLogs] = useState<any[]>([]);
   const [pointsLogs, setPointsLogs] = useState<any[]>([]);
+  const [balancePagination, setBalancePagination] = useState({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
+  const [pointsPagination, setPointsPagination] = useState({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
+  const [balanceSearch, setBalanceSearch] = useState('');
+  const [pointsSearch, setPointsSearch] = useState('');
+  const debouncedBalanceSearch = useDebounce(balanceSearch, 500);
+  const debouncedPointsSearch = useDebounce(pointsSearch, 500);
   const [isAdjustOpen, setIsAdjustOpen] = useState(false);
   const [adjustType, setAdjustType] = useState<'balance' | 'points'>('balance');
   const [adjustData, setAdjustData] = useState({ userId: '', type: 'add' as any, amount: 0, remark: '' });
@@ -179,26 +185,36 @@ export const AdminUserManagement: React.FC<UserListProps> = ({ activePlugins = [
   };
 
   const fetchLogsAndTokens = async () => {
+    setIsLoading(true);
     try {
       if (activeTab === 'balance') {
-        const res = await fetch('/api/v1/users/balance/logs');
+        const res = await fetch(`/api/v1/users/balance/logs?page=${balancePagination.page}&pageSize=${balancePagination.pageSize}&search=${encodeURIComponent(debouncedBalanceSearch)}`);
         const data = await res.json();
-        if (data.success) setBalanceLogs(data.data);
+        if (data.success) {
+          setBalanceLogs(data.data);
+          setBalancePagination(prev => ({ ...prev, ...data.meta }));
+        }
       } else if (activeTab === 'points') {
-        const res = await fetch('/api/v1/users/points/logs');
+        const res = await fetch(`/api/v1/users/points/logs?page=${pointsPagination.page}&pageSize=${pointsPagination.pageSize}&search=${encodeURIComponent(debouncedPointsSearch)}`);
         const data = await res.json();
-        if (data.success) setPointsLogs(data.data);
+        if (data.success) {
+          setPointsLogs(data.data);
+          setPointsPagination(prev => ({ ...prev, ...data.meta }));
+        }
       } else if (activeTab === 'api') {
         const res = await fetch('/api/v1/users/tokens/all');
         const data = await res.json();
         if (data.success) setApiTokens(data.data);
       }
     } catch (e) { console.error(e); }
+    finally { setIsLoading(false); }
   };
 
   useEffect(() => { fetchData(1, debouncedSearch); }, [debouncedSearch]);
   useEffect(() => { if (activeTab === 'list') fetchData(pagination.page); }, [pagination.page]);
-  useEffect(() => { fetchLogsAndTokens(); }, [activeTab]);
+  useEffect(() => { if (activeTab === 'balance') fetchLogsAndTokens(); }, [activeTab, balancePagination.page, debouncedBalanceSearch]);
+  useEffect(() => { if (activeTab === 'points') fetchLogsAndTokens(); }, [activeTab, pointsPagination.page, debouncedPointsSearch]);
+  useEffect(() => { if (activeTab === 'api') fetchLogsAndTokens(); }, [activeTab]);
 
   // Handlers (Simplified for brevity, but same logic)
   const handleIssueToken = async (e: React.FormEvent) => { e.preventDefault(); setIsLoading(true); try { const res = await fetch(`/api/v1/users/${issueData.userId}/tokens`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: issueData.name }) }); const result = await res.json(); if (result.success) { setNewlyIssuedToken(result.token); fetchLogsAndTokens(); } } catch (e) { setError('令牌颁发失败'); } finally { setIsLoading(false); } };
@@ -317,8 +333,66 @@ export const AdminUserManagement: React.FC<UserListProps> = ({ activePlugins = [
           </TabsContent>
 
           {/* Logs & API Tabs (Unchanged logic but same layout) */}
-          <TabsContent value="balance" className="mt-0"><div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><table className="w-full border-collapse text-left text-sm table-fixed"><thead className="bg-slate-50/50 border-b"><tr><th className="w-[30%] px-6 py-4 font-semibold">会员账号</th><th className="w-[15%] px-6 py-4 font-semibold text-center">类型</th><th className="w-[15%] px-6 py-4 font-semibold text-center">变动数值</th><th className="w-[40%] px-6 py-4 font-semibold">操作备注 / 时间</th></tr></thead><tbody className="divide-y">{balanceLogs.map(log => (<tr key={log.id} className="hover:bg-slate-50/50"><td className="px-6 py-4"><div className="flex flex-col"><span className="font-medium text-slate-900">{log.nickname || '系统会员'}</span><span className="text-xs text-slate-400">{log.email}</span></div></td><td className="px-6 py-4 text-center"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${log.type === 'add' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>{log.type === 'add' ? '调增' : log.type === 'sub' ? '调减' : '重置'}</span></td><td className="px-6 py-4 text-center font-bold font-mono text-blue-600">{log.type === 'sub' ? '-' : '+'}{(log.amount / 100).toFixed(2)}</td><td className="px-6 py-4"><div className="flex flex-col"><span className="text-slate-600">{log.remark || '无备注'}</span><span className="text-[10px] text-slate-400">{new Date(log.createdAt).toLocaleString()} ({(log.before / 100).toFixed(2)} → {(log.after / 100).toFixed(2)})</span></div></td></tr>))}</tbody></table></div></TabsContent>
-          <TabsContent value="points" className="mt-0"><div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><table className="w-full border-collapse text-left text-sm table-fixed"><thead className="bg-slate-50/50 border-b"><tr><th className="w-[30%] px-6 py-4 font-semibold">会员账号</th><th className="w-[15%] px-6 py-4 font-semibold text-center">类型</th><th className="w-[15%] px-6 py-4 font-semibold text-center">变动数值</th><th className="w-[40%] px-6 py-4 font-semibold">操作备注 / 时间</th></tr></thead><tbody className="divide-y">{pointsLogs.map(log => (<tr key={log.id} className="hover:bg-slate-50/50"><td className="px-6 py-4">{log.email}</td><td className="px-6 py-4 text-center"><span className="px-2 py-0.5 bg-orange-50 text-orange-600 rounded text-[10px] font-bold">{log.type}</span></td><td className="px-6 py-4 text-center font-bold font-mono text-orange-600">{log.amount}</td><td className="px-6 py-4"><div className="flex flex-col"><span className="text-slate-600">{log.remark}</span><span className="text-[10px] text-slate-400">{new Date(log.createdAt).toLocaleString()} ({log.before} → {log.after})</span></div></td></tr>))}</tbody></table></div></TabsContent>
+          <TabsContent value="balance" className="mt-0 space-y-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+               <div className="relative w-full sm:w-[400px]">
+                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                 <Input value={balanceSearch} onChange={e => { setBalanceSearch(e.target.value); setBalancePagination(p => ({ ...p, page: 1 })); }} className="pl-10 h-11 bg-slate-50 border-none rounded-xl" placeholder="搜索邮箱、昵称或备注..." />
+               </div>
+               <div className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg">共 {balancePagination.total} 条记录</div>
+            </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <table className="w-full border-collapse text-left text-sm table-fixed">
+                <thead className="bg-slate-50/50 border-b">
+                  <tr><th className="w-[30%] px-6 py-4 font-semibold">会员账号</th><th className="w-[15%] px-6 py-4 font-semibold text-center">类型</th><th className="w-[15%] px-6 py-4 font-semibold text-center">变动数值</th><th className="w-[40%] px-6 py-4 font-semibold">操作备注 / 时间</th></tr>
+                </thead>
+                <tbody className="divide-y">
+                  {balanceLogs.map(log => (<tr key={log.id} className="hover:bg-slate-50/50"><td className="px-6 py-4"><div className="flex flex-col"><span className="font-medium text-slate-900">{log.nickname || '系统会员'}</span><span className="text-xs text-slate-400">{log.email}</span></div></td><td className="px-6 py-4 text-center"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${log.type === 'add' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>{log.type === 'add' ? '调增' : log.type === 'sub' ? '调减' : '重置'}</span></td><td className="px-6 py-4 text-center font-bold font-mono text-blue-600">{log.type === 'sub' ? '-' : '+'}{(log.amount / 100).toFixed(2)}</td><td className="px-6 py-4"><div className="flex flex-col"><span className="text-slate-600">{log.remark || '无备注'}</span><span className="text-[10px] text-slate-400">{new Date(log.createdAt).toLocaleString()} ({(log.before / 100).toFixed(2)} → {(log.after / 100).toFixed(2)})</span></div></td></tr>))}
+                  {balanceLogs.length === 0 && !isLoading && <tr><td colSpan={4} className="py-20 text-center text-slate-400">暂无相关流水记录</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            {/* Pagination for Balance */}
+            {balancePagination.totalPages > 1 && (
+              <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200">
+                 <div className="text-xs text-slate-500">第 {balancePagination.page} / {balancePagination.totalPages} 页</div>
+                 <div className="flex gap-2">
+                   <Button variant="outline" size="sm" disabled={balancePagination.page <= 1 || isLoading} onClick={() => setBalancePagination(p => ({ ...p, page: p.page - 1 }))} className="h-9 px-3"><ChevronLeft className="w-4 h-4 mr-1" /> 上一页</Button>
+                   <Button variant="outline" size="sm" disabled={balancePagination.page >= balancePagination.totalPages || isLoading} onClick={() => setBalancePagination(p => ({ ...p, page: p.page + 1 }))} className="h-9 px-3">下一页 <ChevronRight className="w-4 h-4 ml-1" /></Button>
+                 </div>
+              </div>
+            )}
+          </TabsContent>
+          <TabsContent value="points" className="mt-0 space-y-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+               <div className="relative w-full sm:w-[400px]">
+                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                 <Input value={pointsSearch} onChange={e => { setPointsSearch(e.target.value); setPointsPagination(p => ({ ...p, page: 1 })); }} className="pl-10 h-11 bg-slate-50 border-none rounded-xl" placeholder="搜索邮箱、昵称或备注..." />
+               </div>
+               <div className="text-xs font-bold text-orange-600 bg-orange-50 px-3 py-1.5 rounded-lg">共 {pointsPagination.total} 条记录</div>
+            </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <table className="w-full border-collapse text-left text-sm table-fixed">
+                <thead className="bg-slate-50/50 border-b">
+                  <tr><th className="w-[30%] px-6 py-4 font-semibold">会员账号</th><th className="w-[15%] px-6 py-4 font-semibold text-center">类型</th><th className="w-[15%] px-6 py-4 font-semibold text-center">变动数值</th><th className="w-[40%] px-6 py-4 font-semibold">操作备注 / 时间</th></tr>
+                </thead>
+                <tbody className="divide-y">
+                  {pointsLogs.map(log => (<tr key={log.id} className="hover:bg-slate-50/50"><td className="px-6 py-4"><div className="flex flex-col"><span className="font-medium text-slate-900">{log.nickname || '系统会员'}</span><span className="text-xs text-slate-400">{log.email}</span></div></td><td className="px-6 py-4 text-center"><span className="px-2 py-0.5 bg-orange-50 text-orange-600 rounded text-[10px] font-bold">{log.type}</span></td><td className="px-6 py-4 text-center font-bold font-mono text-orange-600">{log.amount}</td><td className="px-6 py-4"><div className="flex flex-col"><span className="text-slate-600">{log.remark}</span><span className="text-[10px] text-slate-400">{new Date(log.createdAt).toLocaleString()} ({log.before} → {log.after})</span></div></td></tr>))}
+                  {pointsLogs.length === 0 && !isLoading && <tr><td colSpan={4} className="py-20 text-center text-slate-400">暂无相关积分记录</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            {/* Pagination for Points */}
+            {pointsPagination.totalPages > 1 && (
+              <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200">
+                 <div className="text-xs text-slate-500">第 {pointsPagination.page} / {pointsPagination.totalPages} 页</div>
+                 <div className="flex gap-2">
+                   <Button variant="outline" size="sm" disabled={pointsPagination.page <= 1 || isLoading} onClick={() => setPointsPagination(p => ({ ...p, page: p.page - 1 }))} className="h-9 px-3"><ChevronLeft className="w-4 h-4 mr-1" /> 上一页</Button>
+                   <Button variant="outline" size="sm" disabled={pointsPagination.page >= pointsPagination.totalPages || isLoading} onClick={() => setPointsPagination(p => ({ ...p, page: p.page + 1 }))} className="h-9 px-3">下一页 <ChevronRight className="w-4 h-4 ml-1" /></Button>
+                 </div>
+              </div>
+            )}
+          </TabsContent>
           <TabsContent value="api" className="mt-0 space-y-6"><div className="flex justify-end"><Button onClick={() => setIsIssueTokenOpen(true)} className="bg-slate-900 text-white shadow-lg"><Key className="w-4 h-4 mr-2" /> 颁发全新 API 令牌</Button></div><div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><table className="w-full text-sm text-slate-600 table-fixed"><thead className="bg-slate-50/50 border-b"><tr><th className="w-[30%] px-6 py-4 font-semibold">持有会员</th><th className="w-[20%] px-6 py-4 font-semibold">令牌名称</th><th className="w-[30%] px-6 py-4 font-semibold">令牌摘要</th><th className="w-[20%] px-6 py-4 font-semibold text-right">操作</th></tr></thead><tbody className="divide-y">{apiTokens.map(token => (<tr key={token.id} className="hover:bg-slate-50/50"><td className="px-6 py-4 font-medium text-slate-900">{token.email}</td><td className="px-6 py-4">{token.name}</td><td className="px-6 py-4 font-mono text-xs text-blue-600">{token.token.substring(0, 12)}...</td><td className="px-6 py-4 text-right"><button onClick={() => handleRevokeToken(token.id)} className="text-rose-500 hover:bg-rose-50 p-2 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button></td></tr>))}</tbody></table></div></TabsContent>
         </Tabs>
 
