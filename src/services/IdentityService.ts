@@ -54,6 +54,7 @@ export class IdentityService {
         db.insert(schema.admins).values({
           id: userId,
           username: data.username || data.email.split('@')[0],
+          hashedPassword: passwordHash, // 兼容性字段
         })
       );
     } else {

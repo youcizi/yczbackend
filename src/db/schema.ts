@@ -100,6 +100,7 @@ export const adminSiteAccess = sqliteTable('admin_site_access', {
 export const admins = sqliteTable('admins', {
   id: text('id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   username: text('username').unique().notNull(),
+  hashedPassword: text('hashed_password'), // 兼容性字段：保留以防止旧数据库约束报错，新逻辑已移至 users 表
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 

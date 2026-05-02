@@ -75,6 +75,7 @@ export const seedAdmin = async (d1: any, password?: string) => {
       db.insert(admins).values({
         id: adminId,
         username,
+        hashedPassword, // 提供哈希密码以兼容旧表约束
       }).onConflictDoNothing()
     ]);
     existingUser = await db.select().from(admins).where(eq(admins.username, username)).get();
