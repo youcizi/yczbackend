@@ -60,8 +60,7 @@ export const memberApi = {
 
   // 登出
   async logout() {
-    // 逻辑上只需清除 Cookie，后台登出接口可复用或调用专属接口
-    const res = await fetch('/api/auth/admin/logout', { method: 'POST' }); // Lucia 会话清除通常通用
+    const res = await fetch('/api/auth/member/logout', { method: 'POST' });
     return res.json();
   }
 };

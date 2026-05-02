@@ -5,6 +5,9 @@ import { memberApi } from '../lib/api';
 export const Profile: React.FC<{ user: any, onNavigate: (p: any) => void, onUpdate: () => void, onLogout: () => void }> = ({ user, onNavigate, onUpdate, onLogout }) => {
   const [nickname, setNickname] = useState(user?.nickname || '');
   const [gender, setGender] = useState(user?.gender || 'unknown');
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [birthday, setBirthday] = useState(user?.birthday || '');
+  const [bio, setBio] = useState(user?.bio || '');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
@@ -12,7 +15,7 @@ export const Profile: React.FC<{ user: any, onNavigate: (p: any) => void, onUpda
     setLoading(true);
     setMessage({ type: '', text: '' });
     try {
-      const res = await memberApi.updateProfile({ nickname, gender });
+      const res = await memberApi.updateProfile({ nickname, gender, phone, birthday, bio });
       if (res.error) throw new Error(res.error);
       setMessage({ type: 'success', text: '资料更新成功！' });
       onUpdate(); // 刷新父组件状态
@@ -54,7 +57,7 @@ export const Profile: React.FC<{ user: any, onNavigate: (p: any) => void, onUpda
             </div>
             <div>
               <h3 className="text-xl font-bold text-slate-900">{user?.nickname || user?.email}</h3>
-              <p className="text-sm text-slate-500">账号 ID: {user?.id?.substring(0, 8)}...</p>
+              <p className="text-sm text-slate-500">账号 ID: {user?.id}</p>
               <div className="mt-2 inline-flex items-center gap-1.5 bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-black uppercase">
                 <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
                 已激活会员
@@ -83,10 +86,37 @@ export const Profile: React.FC<{ user: any, onNavigate: (p: any) => void, onUpda
                 value={gender}
                 onChange={(e) => setGender(e.target.value)}
               >
-                <option value="unknown">未设置</option>
+                <option value="secret">保密</option>
                 <option value="male">男</option>
                 <option value="female">女</option>
               </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">联系电话</label>
+              <input 
+                placeholder="尚未绑定" 
+                className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl text-slate-900 font-bold focus:ring-2 focus:ring-blue-600 outline-none transition-all" 
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">生日</label>
+              <input 
+                type="date"
+                className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl text-slate-900 font-bold focus:ring-2 focus:ring-blue-600 outline-none transition-all" 
+                value={birthday}
+                onChange={(e) => setBirthday(e.target.value)}
+              />
+            </div>
+            <div className="md:col-span-2 space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">个人简介</label>
+              <textarea 
+                placeholder="介绍一下你自己..." 
+                className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl text-slate-900 font-bold focus:ring-2 focus:ring-blue-600 outline-none transition-all min-h-[100px]" 
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+              />
             </div>
           </div>
 

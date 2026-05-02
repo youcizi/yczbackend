@@ -300,6 +300,9 @@ auth.get('/member/me', async (c) => {
     nickname: schema.members.nickname,
     avatar: schema.members.avatar,
     gender: schema.members.gender,
+    phone: schema.members.phone,
+    birthday: schema.members.birthday,
+    bio: schema.members.bio,
     balance: schema.members.balance,
     points: schema.members.points
   })
@@ -316,7 +319,7 @@ auth.get('/member/me', async (c) => {
  */
 auth.post('/member/update-profile', async (c) => {
   const { userAuth } = await getAuthInstances(c.env.DB);
-  const { nickname, gender, avatar } = await c.req.json();
+  const { nickname, gender, avatar, phone, birthday, bio } = await c.req.json();
   const authHeader = c.req.header('Cookie');
   const sessionId = userAuth.readSessionCookie(authHeader ?? '');
   
@@ -331,6 +334,9 @@ auth.post('/member/update-profile', async (c) => {
       nickname, 
       gender, 
       avatar,
+      phone,
+      birthday,
+      bio,
       updatedAt: new Date()
     })
     .where(eq(schema.members.id, user.id))
@@ -364,6 +370,24 @@ auth.post('/member/reset-password', async (c) => {
   await db.update(schema.users).set({ passwordHash: newHash }).where(eq(schema.users.id, user.id)).run();
 
   return c.json({ success: true, message: '密码已修改' });
+});
+
+/**
+ * 会员退出登录
+ */
+auth.post('/member/logout', async (c) => {
+  const { userAuth } = await getAuthInstances(c.env.DB);
+  const authHeader = c.req.header('Cookie');
+  const sessionId = userAuth.readSessionCookie(authHeader ?? '');
+
+  if (sessionId) {
+    await userAuth.invalidateSession(sessionId);
+  }
+
+  const sessionCookie = userAuth.createBlankSessionCookie();
+  c.header('Set-Cookie', sessionCookie.serialize(), { append: true });
+
+  return c.json({ success: true, message: '已安全登出' });
 });
 
 export default auth;

@@ -15,19 +15,21 @@ export const Dashboard: React.FC<{ user: any, onNavigate: (p: any) => void, onLo
       <main className="flex-1 p-6 lg:p-12 space-y-8">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-black text-slate-900">您好, {user?.nickname || user?.email?.split('@')[0]}!</h1>
-            <p className="text-slate-500 font-medium">欢迎回到您的专属会员中心</p>
+            <h1 className="text-3xl font-black text-slate-900">
+              {user?.nickname || user?.email?.split('@')[0]}，欢迎回来！
+            </h1>
+            <p className="text-slate-500 font-medium">今天是 {new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}</p>
           </div>
           <div className="flex items-center gap-3 bg-white p-2 pr-6 rounded-2xl border border-slate-100 shadow-sm">
-            <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 overflow-hidden">
+            <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 overflow-hidden shadow-inner">
               {user?.avatar ? (
                 <img src={user.avatar} alt="Avatar" className="h-full w-full object-cover" />
               ) : (
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd"></path></svg>
+                <div className="text-sm font-bold">{user?.nickname?.[0] || user?.email?.[0]?.toUpperCase()}</div>
               )}
             </div>
             <div>
-              <div className="text-xs font-black uppercase text-slate-400 leading-tight">会员等级</div>
+              <div className="text-[10px] font-black uppercase text-slate-400 leading-tight tracking-widest">会员等级</div>
               <div className="text-sm font-bold text-blue-600 leading-tight">LV.{user?.level || 1} 尊贵会员</div>
             </div>
           </div>
@@ -58,24 +60,40 @@ export const Dashboard: React.FC<{ user: any, onNavigate: (p: any) => void, onLo
           </div>
         </section>
 
-        {/* 最近动态 */}
-        <section className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8">
-          <h3 className="text-xl font-black text-slate-900 mb-6">最近活动</h3>
-          <div className="space-y-6">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="flex items-center gap-4 group">
-                <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-bold text-slate-800">成功登录系统</div>
-                  <div className="text-xs text-slate-400">2024-05-01 10:30:12 • IP: 127.0.0.1</div>
-                </div>
-                <div className="text-xs font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-lg">成功</div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* 详细资料卡片 */}
+          <section className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8">
+            <h3 className="text-xl font-black text-slate-900 mb-6">基本档案</h3>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center py-3 border-b border-slate-50">
+                <span className="text-sm font-medium text-slate-400">电子邮箱</span>
+                <span className="text-sm font-bold text-slate-700">{user?.email}</span>
               </div>
-            ))}
-          </div>
-        </section>
+              <div className="flex justify-between items-center py-3 border-b border-slate-50">
+                <span className="text-sm font-medium text-slate-400">联系电话</span>
+                <span className="text-sm font-bold text-slate-700">{user?.phone || '未绑定'}</span>
+              </div>
+              <div className="flex justify-between items-center py-3 border-b border-slate-50">
+                <span className="text-sm font-medium text-slate-400">性别</span>
+                <span className="text-sm font-bold text-slate-700">
+                  {user?.gender === 'male' ? '男' : user?.gender === 'female' ? '女' : '保密'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-3 border-b border-slate-50">
+                <span className="text-sm font-medium text-slate-400">生日</span>
+                <span className="text-sm font-bold text-slate-700">{user?.birthday || '未设置'}</span>
+              </div>
+            </div>
+          </section>
+
+          {/* 个人简介 */}
+          <section className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8">
+            <h3 className="text-xl font-black text-slate-900 mb-6">个人简介</h3>
+            <div className="bg-slate-50 rounded-2xl p-6 min-h-[140px] text-slate-600 text-sm font-medium leading-relaxed italic">
+              {user?.bio || "该用户很懒，还没有写下任何介绍..."}
+            </div>
+          </section>
+        </div>
       </main>
     </div>
   );
