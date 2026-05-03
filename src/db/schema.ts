@@ -7,6 +7,7 @@ export * from './schema/api_tokens';
 export * from './schema/verification_codes';
 export * from './schema/assets';
 export * from './schema/mail_templates';
+export * from './schema/mail_messages';
 
 // ============================================================================
 // [PLUGIN SCHEMAS] - 插件专属 Schema 挂载点 (由脚本自动生成，请勿手动修改)

@@ -38,16 +38,24 @@ export const MailSettings: React.FC = () => {
     slug: '', name: '', subject: '', content: '', vars: ''
   });
 
+  // --- Inbox State ---
+  const [inboxThreads, setInboxThreads] = useState<any[]>([]);
+  const [selectedThread, setSelectedThread] = useState<any>(null);
+  const [threadMessages, setThreadMessages] = useState<any[]>([]);
+  const [replyContent, setReplyContent] = useState('');
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [configRes, templatesRes] = await Promise.all([
+      const [configRes, templatesRes, inboxRes] = await Promise.all([
         fetch('/api/v1/settings/mail_config'),
-        fetch('/api/v1/settings/mail_templates')
+        fetch('/api/v1/settings/mail_templates'),
+        fetch('/api/v1/settings/mail_inbox')
       ]);
       
       const configData = await configRes.json();
       const templatesData = await templatesRes.json();
+      const inboxData = await inboxRes.json();
 
       setForm({
         provider_type: configData.provider_type || 'resend',
@@ -61,13 +69,52 @@ export const MailSettings: React.FC = () => {
         }
       });
 
-      if (templatesData.success) {
-        setTemplates(templatesData.data);
-      }
+      if (templatesData.success) setTemplates(templatesData.data);
+      if (inboxData.success) setInboxThreads(inboxData.data);
     } catch (e) {
-      toast({ variant: 'destructive', title: '加载失败', description: '无法获取邮件配置' });
+      toast({ variant: 'destructive', title: '加载失败' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchThread = async (threadId: string) => {
+    try {
+      const res = await fetch(`/api/v1/settings/mail_inbox/${threadId}`);
+      const data = await res.json();
+      if (data.success) {
+        setThreadMessages(data.data);
+        // 更新本地未读状态
+        setInboxThreads(prev => prev.map(t => t.threadId === threadId ? { ...t, unread: false } : t));
+      }
+    } catch (e) {
+      toast({ variant: 'destructive', title: '加载对话失败' });
+    }
+  };
+
+  const handleReply = async () => {
+    if (!replyContent.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch('/api/v1/settings/mail_inbox/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          threadId: selectedThread.threadId,
+          to: selectedThread.fromEmail,
+          subject: selectedThread.subject,
+          content: replyContent
+        })
+      });
+      if (res.ok) {
+        setReplyContent('');
+        fetchThread(selectedThread.threadId);
+        toast({ title: '回复已发送' });
+      }
+    } catch (e) {
+      toast({ variant: 'destructive', title: '回复失败' });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -144,8 +191,10 @@ export const MailSettings: React.FC = () => {
         <TabsList className="bg-slate-100 p-1 rounded-xl mb-6">
           <TabsTrigger value="config" className="px-8 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all">服务渠道配置</TabsTrigger>
           <TabsTrigger value="templates" className="px-8 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all">邮件内容模板</TabsTrigger>
+          <TabsTrigger value="inbox" className="px-8 py-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all">收件箱 (Inbox)</TabsTrigger>
         </TabsList>
 
+        {/* --- 配置选项卡 --- */}
         <TabsContent value="config" className="mt-0">
           <Card className="border-slate-100 shadow-sm overflow-hidden">
             <CardHeader className="border-b bg-slate-50/80 px-6 py-4">
@@ -168,7 +217,7 @@ export const MailSettings: React.FC = () => {
                 <div className="mt-0.5"><Code size={16} /></div>
                 <div>
                   <p className="font-semibold mb-1">当前生效模式：{form.provider_type === 'resend' ? 'Resend API' : '自定义 SMTP'}</p>
-                  <p className="opacity-80">系统将仅使用您下方选中的配置项进行发送。{form.provider_type === 'resend' ? '推荐在 Serverless 环境中使用 Resend 以获得最佳可靠性。' : '使用 SMTP 时请确保 465 端口或 TLS 环境畅通。'}</p>
+                  <p className="opacity-80">系统将仅使用您下方选中的配置项进行发送。推荐在 Serverless 环境中使用 Resend。</p>
                 </div>
               </div>
 
@@ -197,11 +246,11 @@ export const MailSettings: React.FC = () => {
                       <Input type="number" value={form.smtp_config.port} onChange={e => setForm({...form, smtp_config: {...form.smtp_config, port: parseInt(e.target.value) || 465}})} placeholder="465" />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-bold text-slate-700">认证账号 (User)</label>
+                      <label className="text-sm font-bold text-slate-700">认证账号</label>
                       <Input value={form.smtp_config.user} onChange={e => setForm({...form, smtp_config: {...form.smtp_config, user: e.target.value}})} placeholder="no-reply@example.com" />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-bold text-slate-700">认证密码 (Password)</label>
+                      <label className="text-sm font-bold text-slate-700">认证密码</label>
                       <Input type="password" value={form.smtp_config.pass} onChange={e => setForm({...form, smtp_config: {...form.smtp_config, pass: e.target.value}})} placeholder="********" />
                     </div>
                   </div>
@@ -209,15 +258,91 @@ export const MailSettings: React.FC = () => {
               )}
 
               <div className="mt-10 pt-6 border-t flex justify-end">
-                <Button onClick={handleSaveConfig} loading={saving} className="bg-blue-600 hover:bg-blue-700 text-white px-8 h-11 rounded-xl shadow-lg shadow-blue-600/20">
-                  {!saving && <Save className="mr-2" size={18} />}
-                  保存渠道配置
+                <Button onClick={handleSaveConfig} loading={saving} className="bg-blue-600 text-white px-8 h-11 rounded-xl">
+                  <Save className="mr-2" size={18} /> 保存渠道配置
                 </Button>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* --- 收件箱选项卡 --- */}
+        <TabsContent value="inbox" className="mt-0">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[600px]">
+            <div className="md:col-span-1 border rounded-xl bg-white overflow-hidden flex flex-col">
+              <div className="p-4 border-b bg-slate-50 font-bold text-sm text-slate-700 flex items-center justify-between">
+                会话列表
+                <Button variant="outline" size="sm" onClick={fetchData} className="h-7 w-7 p-0"><Loader2 size={12} className={loading ? 'animate-spin' : ''} /></Button>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                {inboxThreads.length === 0 ? (
+                  <div className="p-10 text-center text-slate-400 text-sm">暂无往来邮件</div>
+                ) : (
+                  inboxThreads.map(thread => (
+                    <div 
+                      key={thread.threadId}
+                      onClick={() => { setSelectedThread(thread); fetchThread(thread.threadId); }}
+                      className={`p-4 border-b cursor-pointer transition-colors hover:bg-slate-50 ${selectedThread?.threadId === thread.threadId ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''}`}
+                    >
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="text-xs font-bold text-slate-900 truncate max-w-[120px]">{thread.fromEmail}</span>
+                        <span className="text-[10px] text-slate-400">{new Date(thread.lastTime).toLocaleDateString()}</span>
+                      </div>
+                      <p className="text-xs text-slate-800 font-semibold truncate mb-1">{thread.subject || '(无主题)'}</p>
+                      <p className="text-[11px] text-slate-500 line-clamp-1">{thread.lastMessage}</p>
+                      {thread.unread && <div className="mt-2 inline-block px-1.5 py-0.5 bg-rose-500 text-white text-[10px] rounded-full">未读</div>}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="md:col-span-2 border rounded-xl bg-white flex flex-col overflow-hidden">
+              {selectedThread ? (
+                <>
+                  <div className="p-4 border-b bg-slate-50 flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-slate-900">{selectedThread.subject}</h4>
+                      <p className="text-xs text-slate-500">{selectedThread.fromEmail}</p>
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/30">
+                    {threadMessages.map(msg => (
+                      <div key={msg.id} className={`flex ${msg.direction === 'inbound' ? 'justify-start' : 'justify-end'}`}>
+                        <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${msg.direction === 'inbound' ? 'bg-white border text-slate-800 rounded-tl-none' : 'bg-blue-600 text-white rounded-tr-none shadow-md shadow-blue-600/10'}`}>
+                          <div className="mb-2 whitespace-pre-wrap">{msg.content}</div>
+                          <div className={`text-[10px] ${msg.direction === 'inbound' ? 'text-slate-400' : 'text-blue-100'}`}>
+                            {new Date(msg.createdAt).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="p-4 border-t bg-white">
+                    <textarea 
+                      className="w-full p-3 text-sm border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px] resize-none"
+                      placeholder="输入您的回复..."
+                      value={replyContent}
+                      onChange={e => setReplyContent(e.target.value)}
+                    />
+                    <div className="mt-2 flex justify-end">
+                      <Button onClick={handleReply} loading={saving} className="bg-blue-600 text-white px-6">发送回复</Button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-10 text-center">
+                  <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                    <Mail size={32} />
+                  </div>
+                  <p className="text-sm">从左侧选择一个会话开始沟通</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* --- 模板选项卡 --- */}
         <TabsContent value="templates" className="mt-0 space-y-4">
           <div className="flex justify-between items-center mb-2">
             <h3 className="text-lg font-bold text-slate-800">邮件业务模板</h3>
@@ -254,6 +379,7 @@ export const MailSettings: React.FC = () => {
           </div>
         </TabsContent>
       </Tabs>
+
 
       {/* --- Success Dialog --- */}
       <Dialog open={showSuccess} onOpenChange={setShowSuccess}>

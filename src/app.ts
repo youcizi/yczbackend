@@ -14,7 +14,7 @@ import ai, { publicAiGateway } from './routes/ai';
 import { validateConfig } from './lib/config';
 import { getAuthInstances } from './lib/auth';
 import { createDbClient, sql } from './db';
-import { models, collections } from './db/schema';
+import { models, collections, mailTemplates, mailMessages } from './db/schema';
 import { seedAdmin } from './core/seed';
 import { PermissionRegistry, registry as globalRegistry } from './lib/permission-registry';
 import { requirePermission } from './middleware/rbac';
@@ -60,6 +60,7 @@ async function performSystemSync(c: any, registry: PermissionRegistry) {
       await db.run(sql`CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, description TEXT, updated_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS verification_codes (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL, code TEXT NOT NULL, type TEXT DEFAULT 'register', expires_at INTEGER NOT NULL, created_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS mail_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT UNIQUE NOT NULL, name TEXT NOT NULL, subject TEXT NOT NULL, content TEXT NOT NULL, vars TEXT, updated_at INTEGER)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS mail_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, thread_id TEXT NOT NULL, from_email TEXT NOT NULL, to_email TEXT NOT NULL, subject TEXT, content TEXT NOT NULL, direction TEXT NOT NULL, status TEXT DEFAULT 'unread', metadata TEXT, created_at INTEGER)`);
       
       // Seed default template if not exists
       await db.run(sql`INSERT OR IGNORE INTO mail_templates (slug, name, subject, content, vars) VALUES ('register_code', '注册验证码', '您的注册验证码', '<div style="font-family: Arial; padding: 20px;"><h2>欢迎注册</h2><p>您的验证码是：<strong style="font-size: 24px; color: #2563eb;">{{code}}</strong></p><p>有效期为 10 分钟，请尽快完成注册。</p></div>', '{"code": "验证码内容"}')`);

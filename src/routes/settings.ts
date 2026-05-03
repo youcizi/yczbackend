@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { createDbClient } from '../db';
-import { systemSettings, languages, mailTemplates } from '../db/schema';
+import { systemSettings, languages, mailTemplates, mailMessages } from '../db/schema';
+import { MailService } from '../services/MailService';
+import { desc } from 'drizzle-orm';
 import { requirePermission } from '../middleware/rbac';
 
 const settingsRoutes = new Hono<{ Bindings: any }>();
@@ -322,6 +324,94 @@ settingsRoutes.delete('/mail_templates/:id', requirePermission(['settings.mail',
   const db = await createDbClient(c.env.DB);
   await db.delete(mailTemplates).where(eq(mailTemplates.id, id));
   return c.json({ success: true });
+});
+
+// GET /api/v1/settings/mail_inbox
+settingsRoutes.get('/mail_inbox', requirePermission(['settings.mail', 'role.manage']), async (c) => {
+  try {
+    const db = await createDbClient(c.env.DB);
+    // 获取每个会话的最后一条消息
+    const list = await db.select()
+      .from(mailMessages)
+      .orderBy(desc(mailMessages.createdAt))
+      .all();
+      
+    // 按 threadId 分组
+    const threads: Record<string, any> = {};
+    list.forEach(msg => {
+      if (!threads[msg.threadId]) {
+        threads[msg.threadId] = {
+          threadId: msg.threadId,
+          fromEmail: msg.direction === 'inbound' ? msg.fromEmail : msg.toEmail,
+          subject: msg.subject,
+          lastMessage: msg.content,
+          lastTime: msg.createdAt,
+          unread: msg.status === 'unread' && msg.direction === 'inbound'
+        };
+      } else if (msg.status === 'unread' && msg.direction === 'inbound') {
+        threads[msg.threadId].unread = true;
+      }
+    });
+
+    return c.json({ success: true, data: Object.values(threads) });
+  } catch (err: any) {
+    console.error('❌ [API Settings] Get mail_inbox failed:', err);
+    return c.json({ error: '获取邮件列表失败: ' + err.message }, 500);
+  }
+});
+
+// GET /api/v1/settings/mail_inbox/:threadId
+settingsRoutes.get('/mail_inbox/:threadId', requirePermission(['settings.mail', 'role.manage']), async (c) => {
+  try {
+    const threadId = c.req.param('threadId');
+    const db = await createDbClient(c.env.DB);
+    const messages = await db.select()
+      .from(mailMessages)
+      .where(eq(mailMessages.threadId, threadId))
+      .orderBy(mailMessages.createdAt)
+      .all();
+
+    // 标记为已读
+    await db.update(mailMessages)
+      .set({ status: 'read' })
+      .where(eq(mailMessages.threadId, threadId));
+
+    return c.json({ success: true, data: messages });
+  } catch (err: any) {
+    console.error('❌ [API Settings] Get mail_inbox thread failed:', err);
+    return c.json({ error: '获取会话详情失败: ' + err.message }, 500);
+  }
+});
+
+// POST /api/v1/settings/mail_inbox/reply
+settingsRoutes.post('/mail_inbox/reply', requirePermission(['settings.mail', 'role.manage']), async (c) => {
+  const { threadId, to, subject, content } = await c.req.json();
+  const db = await createDbClient(c.env.DB);
+
+  // 1. 发送邮件
+  try {
+    await MailService.sendMail(c.env, {
+      to,
+      subject: `Re: ${subject}`,
+      html: content,
+      senderName: 'Customer Support'
+    });
+
+    // 2. 存入数据库
+    await db.insert(mailMessages).values({
+      threadId,
+      fromEmail: 'system', // 或者是配置的发件人
+      toEmail: to,
+      subject: `Re: ${subject}`,
+      content,
+      direction: 'outbound',
+      status: 'replied'
+    });
+
+    return c.json({ success: true });
+  } catch (err: any) {
+    return c.json({ error: '回复失败: ' + err.message }, 500);
+  }
 });
 
 export default settingsRoutes;
