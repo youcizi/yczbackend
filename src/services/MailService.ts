@@ -37,6 +37,8 @@ export class MailService {
     }
 
     const config: MailConfig = JSON.parse(record.value);
+    console.log(`[MailService] Provider: ${config.provider_type}, To: ${options.to}`);
+    
     const recipients = Array.isArray(options.to) ? options.to : [options.to];
     const senderEmail = config.sender_email || 'onboarding@resend.dev';
     const from = options.senderName ? `${options.senderName} <${senderEmail}>` : senderEmail;
@@ -75,5 +77,44 @@ export class MailService {
     }
 
     return false;
+  }
+
+  /**
+   * 使用数据库模板发送邮件
+   */
+  static async sendWithTemplate(
+    env: any,
+    options: {
+      to: string | string[];
+      templateSlug: string;
+      vars: Record<string, string>;
+      senderName?: string;
+    }
+  ) {
+    const db = await createDbClient(env.DB);
+    const template = await db.query.mailTemplates.findFirst({
+      where: eq(schema.mailTemplates.slug, options.templateSlug)
+    });
+
+    if (!template) {
+      throw new Error(`邮件模板不存在: ${options.templateSlug}`);
+    }
+
+    let html = template.content;
+    let subject = template.subject;
+
+    // 变量替换 {{var}}
+    Object.entries(options.vars).forEach(([key, value]) => {
+      const regex = new RegExp(`{{${key}}}`, 'g');
+      html = html.replace(regex, value);
+      subject = subject.replace(regex, value);
+    });
+
+    return this.sendMail(env, {
+      to: options.to,
+      subject: subject,
+      html: html,
+      senderName: options.senderName
+    });
   }
 }

@@ -59,6 +59,10 @@ async function performSystemSync(c: any, registry: PermissionRegistry) {
       await db.run(sql`CREATE TABLE IF NOT EXISTS media_items (id INTEGER PRIMARY KEY AUTOINCREMENT, url TEXT NOT NULL, filename TEXT NOT NULL, mime_type TEXT NOT NULL, size INTEGER NOT NULL, is_remote INTEGER DEFAULT 0, created_by TEXT, metadata TEXT, created_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, description TEXT, updated_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS verification_codes (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL, code TEXT NOT NULL, type TEXT DEFAULT 'register', expires_at INTEGER NOT NULL, created_at INTEGER)`);
+      await db.run(sql`CREATE TABLE IF NOT EXISTS mail_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT UNIQUE NOT NULL, name TEXT NOT NULL, subject TEXT NOT NULL, content TEXT NOT NULL, vars TEXT, updated_at INTEGER)`);
+      
+      // Seed default template if not exists
+      await db.run(sql`INSERT OR IGNORE INTO mail_templates (slug, name, subject, content, vars) VALUES ('register_code', '注册验证码', '您的注册验证码', '<div style="font-family: Arial; padding: 20px;"><h2>欢迎注册</h2><p>您的验证码是：<strong style="font-size: 24px; color: #2563eb;">{{code}}</strong></p><p>有效期为 10 分钟，请尽快完成注册。</p></div>', '{"code": "验证码内容"}')`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS p_member_profiles (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, member_id TEXT NOT NULL, name TEXT, avatar TEXT, phone TEXT, account_type TEXT DEFAULT 'individual', tier_id INTEGER DEFAULT 1, metadata TEXT, created_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS p_member_tiers (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, name TEXT NOT NULL, discount_rate INTEGER DEFAULT 100, created_at INTEGER)`);
       await db.run(sql`CREATE TABLE IF NOT EXISTS p_member_tiers_i18n (id INTEGER PRIMARY KEY AUTOINCREMENT, tier_id INTEGER NOT NULL, lang_code TEXT NOT NULL, name TEXT NOT NULL, UNIQUE(tier_id, lang_code))`);

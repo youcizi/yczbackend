@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { createDbClient } from '../db';
-import { systemSettings, languages } from '../db/schema';
+import { systemSettings, languages, mailTemplates } from '../db/schema';
 import { requirePermission } from '../middleware/rbac';
 
 const settingsRoutes = new Hono<{ Bindings: any }>();
@@ -273,6 +273,54 @@ settingsRoutes.post('/member_levels', requirePermission(['settings.general', 'ro
       .values({ key: 'member_levels', value: valueStr });
   }
 
+  return c.json({ success: true });
+});
+
+// GET /api/v1/settings/mail_templates
+settingsRoutes.get('/mail_templates', requirePermission(['settings.mail', 'role.manage']), async (c) => {
+  try {
+    const db = await createDbClient(c.env.DB);
+    const list = await db.select().from(mailTemplates).all();
+    return c.json({ success: true, data: list });
+  } catch (err: any) {
+    console.error('❌ [API Settings] Get mail_templates failed:', err);
+    return c.json({ error: '获取邮件模板失败: ' + err.message }, 500);
+  }
+});
+
+// POST /api/v1/settings/mail_templates
+settingsRoutes.post('/mail_templates', requirePermission(['settings.mail', 'role.manage']), async (c) => {
+  const body = await c.req.json();
+  const db = await createDbClient(c.env.DB);
+  
+  if (body.id) {
+    await db.update(mailTemplates)
+      .set({ 
+        name: body.name, 
+        subject: body.subject, 
+        content: body.content, 
+        vars: body.vars,
+        updatedAt: new Date() 
+      })
+      .where(eq(mailTemplates.id, body.id));
+  } else {
+    await db.insert(mailTemplates)
+      .values({ 
+        slug: body.slug,
+        name: body.name, 
+        subject: body.subject, 
+        content: body.content, 
+        vars: body.vars
+      });
+  }
+  return c.json({ success: true });
+});
+
+// DELETE /api/v1/settings/mail_templates/:id
+settingsRoutes.delete('/mail_templates/:id', requirePermission(['settings.mail', 'role.manage']), async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const db = await createDbClient(c.env.DB);
+  await db.delete(mailTemplates).where(eq(mailTemplates.id, id));
   return c.json({ success: true });
 });
 

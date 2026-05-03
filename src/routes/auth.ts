@@ -212,16 +212,10 @@ auth.post('/member/send-code', async (c) => {
 
   // 2. 发送邮件
   try {
-    const sent = await MailService.sendMail(c.env, {
+    const sent = await MailService.sendWithTemplate(c.env, {
       to: email,
-      subject: '您的注册验证码',
-      html: `
-        <div style="font-family: Arial; padding: 20px;">
-          <h2>欢迎注册</h2>
-          <p>您的验证码是：<strong style="font-size: 24px; color: #2563eb;">${code}</strong></p>
-          <p>有效期为 10 分钟，请尽快完成注册。</p>
-        </div>
-      `,
+      templateSlug: 'register_code',
+      vars: { code },
       senderName: 'YCZ.ME 独立站系统'
     });
 
